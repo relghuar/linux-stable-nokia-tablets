@@ -166,6 +166,14 @@ int retu_write(struct retu_dev *rdev, u8 reg, u16 data)
 }
 EXPORT_SYMBOL_GPL(retu_write);
 
+static struct retu_dev *tahvo_dev = NULL;
+
+struct retu_dev *tahvo_get_dev() {
+	BUG_ON(tahvo_dev == NULL);
+	return tahvo_dev;
+}
+EXPORT_SYMBOL_GPL(tahvo_get_dev);
+
 static void retu_power_off(void)
 {
 	struct retu_dev *rdev = retu_pm_power_off;
@@ -244,6 +252,7 @@ static int retu_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 
 	i2c_set_clientdata(i2c, rdev);
 	rdev->dev = &i2c->dev;
+
 	mutex_init(&rdev->mutex);
 	rdev->regmap = devm_regmap_init(&i2c->dev, &retu_bus, &i2c->dev,
 					&retu_config);
@@ -283,6 +292,9 @@ static int retu_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 	if (i2c->addr == 1 && !pm_power_off) {
 		retu_pm_power_off = rdev;
 		pm_power_off	  = retu_power_off;
+	}
+	if (i2c->addr == 2) {
+		tahvo_dev = rdev;
 	}
 
 	return 0;
