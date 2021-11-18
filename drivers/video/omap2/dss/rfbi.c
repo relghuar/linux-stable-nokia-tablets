@@ -186,6 +186,7 @@ void omap_rfbi_write_command(const void *buf, u32 len)
 	case OMAP_DSS_RFBI_PARALLELMODE_9:
 	case OMAP_DSS_RFBI_PARALLELMODE_12:
 	default:
+		DSSERR("%s(%d) pmode=%d\n", __func__, len, rfbi.parallelmode);
 		BUG();
 	}
 }
@@ -207,7 +208,7 @@ void omap_rfbi_read_data(void *buf, u32 len)
 	case OMAP_DSS_RFBI_PARALLELMODE_16:
 	{
 		u16 *w = buf;
-		BUG_ON(len & ~1);
+		BUG_ON(len & 1);
 		for (; len; len -= 2) {
 			rfbi_write_reg(RFBI_READ, 0);
 			*w++ = rfbi_read_reg(RFBI_READ);
@@ -218,6 +219,7 @@ void omap_rfbi_read_data(void *buf, u32 len)
 	case OMAP_DSS_RFBI_PARALLELMODE_9:
 	case OMAP_DSS_RFBI_PARALLELMODE_12:
 	default:
+		DSSERR("%s(%d) pmode=%d\n", __func__, len, rfbi.parallelmode);
 		BUG();
 	}
 }
@@ -246,6 +248,7 @@ void omap_rfbi_write_data(const void *buf, u32 len)
 	case OMAP_DSS_RFBI_PARALLELMODE_9:
 	case OMAP_DSS_RFBI_PARALLELMODE_12:
 	default:
+		DSSERR("%s(%d) pmode=%d\n", __func__, len, rfbi.parallelmode);
 		BUG();
 
 	}
@@ -321,11 +324,17 @@ static int rfbi_transfer_area(struct omap_dss_device *dssdev,
 
 	DSSDBG("rfbi_transfer_area %dx%d\n", width, height);
 
-	dss_mgr_set_timings(mgr, &rfbi.timings);
+	if (!dispc_mgr_is_enabled(rfbi.output.dispc_channel)) {
+		dss_mgr_set_timings(mgr, &rfbi.timings);
 
-	r = dss_mgr_enable(mgr);
-	if (r)
-		return r;
+		r = dss_mgr_enable(mgr);
+		if (r) {
+			DSSERR("%s: error enabling mgr(%d)'%s': %d\n", __func__, mgr->id, mgr->name, r);
+			return r;
+		}
+
+		dss_mgr_start_update(mgr);
+	}
 
 	rfbi.framedone_callback = callback;
 	rfbi.framedone_callback_data = data;
@@ -419,8 +428,8 @@ static int calc_reg_timing(struct rfbi_timings *t, int div)
 	DSSDBG("[reg]weon %d weoff %d recyc %d wecyc %d\n",
 	       t->we_on_time, t->we_off_time, t->re_cycle_time,
 	       t->we_cycle_time);
-	DSSDBG("[reg]rdaccess %d cspulse %d\n",
-	       t->access_time, t->cs_pulse_width);
+	DSSDBG("[reg]rdaccess %d cspulse %d (div %d)\n",
+	       t->access_time, t->cs_pulse_width, div);
 
 	return rfbi_convert_timings(t);
 }
@@ -570,6 +579,8 @@ static int rfbi_convert_timings(struct rfbi_timings *t)
 
 	t->converted = 1;
 
+	rfbi_print_timings();
+
 	return 0;
 }
 
@@ -679,6 +690,7 @@ static int rfbi_configure(int rfbi_module, int bpp, int lines)
 		parallelmode = OMAP_DSS_RFBI_PARALLELMODE_16;
 		break;
 	default:
+		DSSERR("rfbi: invalid number of lines (%d)\n", lines);
 		BUG();
 		return 1;
 	}
@@ -864,6 +876,11 @@ static void rfbi_config_lcd_manager(struct omap_dss_device *dssdev)
 	mgr_config.video_port_width = rfbi.pixel_size;
 	mgr_config.lcden_sig_polarity = 0;
 
+	//mgr_config.clock_info.lck = 19200000;
+	mgr_config.clock_info.pck = 21940000;
+	mgr_config.clock_info.lck_div = 1;
+	mgr_config.clock_info.pck_div = 2;
+
 	dss_mgr_set_lcd_config(mgr, &mgr_config);
 
 	/*
@@ -871,6 +888,7 @@ static void rfbi_config_lcd_manager(struct omap_dss_device *dssdev)
 	 * are expected to be already configured by the panel driver via
 	 * omapdss_rfbi_set_size()
 	 */
+	rfbi.timings.pixel_clock = 21940;
 	rfbi.timings.hsw = 1;
 	rfbi.timings.hfp = 1;
 	rfbi.timings.hbp = 1;
@@ -1072,6 +1090,7 @@ static int omap_rfbihw_probe(struct platform_device *pdev)
 	}
 
 	rfbi.l4_khz = clk_get_rate(clk) / 1000;
+	DSSDBG("%s: ick rate %lukHz\n", __func__, rfbi.l4_khz);
 
 	clk_put(clk);
 

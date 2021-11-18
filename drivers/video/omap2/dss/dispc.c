@@ -3049,7 +3049,12 @@ unsigned long dispc_mgr_lclk_rate(enum omap_channel channel)
 			return 0;
 		}
 
-		return r / lcd;
+		if (lcd == 0) {
+			DSSWARN("%s: (%d) r=%lu lcd=%d l=%u - returning 'r'!\n", __func__, channel, r, lcd, l);
+			return r;
+		} else {
+			return r / lcd;
+		}
 	} else {
 		return dispc_fclk_rate();
 	}
@@ -3069,7 +3074,12 @@ unsigned long dispc_mgr_pclk_rate(enum omap_channel channel)
 
 		r = dispc_mgr_lclk_rate(channel);
 
-		return r / pcd;
+		if (pcd == 0) {
+			DSSWARN("%s: (%d) r=%lu pcd=%d l=%d - returning 'r'!\n", __func__, channel, r, pcd, l);
+			return r;
+		} else {
+			return r / pcd;
+		}
 	} else {
 		enum dss_hdmi_venc_clk_source_select source;
 
