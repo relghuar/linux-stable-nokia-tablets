@@ -97,6 +97,12 @@ static inline void blizzard_write(u8 cmd, const u8 *buf, int len)
 	omap_rfbi_write_data(buf, len);
 }
 
+static void blizzard_write_reg(u8 reg, u8 val)
+{
+	omap_rfbi_write_command(&reg, 1);
+	omap_rfbi_write_data(&val, 1);
+}
+
 static inline void blizzard_read(u8 cmd, u8 *buf, int len)
 {
 	omap_rfbi_write_command(&cmd, 1);
@@ -148,16 +154,12 @@ static void blizzard_ctrl_setup_update(struct omap_dss_device *dssdev,
 			BLIZZARD_SRC_WRITE_LCD :
 			BLIZZARD_SRC_WRITE_LCD_DESTRUCTIVE;
 
-	omapdss_rfbi_set_pixel_size(dssdev, 16);
 	omapdss_rfbi_set_data_lines(dssdev, 8);
-
 	omap_rfbi_configure(dssdev);
 
 	blizzard_write(BLIZZARD_INPUT_WIN_X_START_0, tmp, 18);
 
-	omapdss_rfbi_set_pixel_size(dssdev, 16);
 	omapdss_rfbi_set_data_lines(dssdev, 16);
-
 	omap_rfbi_configure(dssdev);
 }
 
@@ -282,6 +284,7 @@ static void send_sleep_in(struct spi_device *spi)
 
 static int n8x0_panel_power_on(struct omap_dss_device *dssdev)
 {
+	u32 l;
 	int r;
 	struct panel_n8x0_data *bdata = get_board_data(dssdev);
 	struct panel_drv_data *ddata = get_drv_data(dssdev);
@@ -293,7 +296,11 @@ static int n8x0_panel_power_on(struct omap_dss_device *dssdev)
 	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
 		return 0;
 
-	gpio_direction_output(bdata->ctrl_pwrdown, 1);
+	bdata->platform_enable(dssdev);
+	msleep(10);
+	gpio_set_value(bdata->ctrl_pwrdown, 1);
+	gpio_set_value(bdata->panel_reset, 1);
+	msleep(10);
 
 	omapdss_rfbi_set_size(dssdev, dssdev->panel.timings.x_res,
 		dssdev->panel.timings.y_res);
@@ -305,29 +312,7 @@ static int n8x0_panel_power_on(struct omap_dss_device *dssdev)
 	if (r)
 		goto err_rfbi_en;
 
-	rev = blizzard_read_reg(BLIZZARD_REV_CODE);
-	conf = blizzard_read_reg(BLIZZARD_CONFIG);
-
-	switch (rev & 0xfc) {
-	case 0x9c:
-		ddata->blizzard_ver = BLIZZARD_VERSION_S1D13744;
-		dev_info(&dssdev->dev, "s1d13744 LCD controller rev %d "
-			"initialized (CNF pins %x)\n", rev & 0x03, conf & 0x07);
-		break;
-	case 0xa4:
-		ddata->blizzard_ver = BLIZZARD_VERSION_S1D13745;
-		dev_info(&dssdev->dev, "s1d13745 LCD controller rev %d "
-			"initialized (CNF pins %x)\n", rev & 0x03, conf & 0x07);
-		break;
-	default:
-		dev_err(&dssdev->dev, "invalid s1d1374x revision %02x\n", rev);
-		r = -ENODEV;
-		goto err_inv_chip;
-	}
-
 	/* panel */
-
-	gpio_direction_output(bdata->panel_reset, 1);
 
 	mipid_read(spi, MIPID_CMD_READ_DISP_ID, display_id, 3);
 	dev_dbg(&spi->dev, "MIPI display ID: %02x%02x%02x\n",
@@ -355,6 +340,47 @@ static int n8x0_panel_power_on(struct omap_dss_device *dssdev)
 	set_data_lines(spi, 24);
 	send_display_on(spi);
 
+	/* framebuffer */
+
+	if (!(blizzard_read_reg(BLIZZARD_PLL_DIV) & 0x80)) {
+		dev_err(&dssdev->dev, "%s controller not initialized by the bootloader\n", __func__);
+	}
+
+	rev = blizzard_read_reg(BLIZZARD_REV_CODE);
+	conf = blizzard_read_reg(BLIZZARD_CONFIG);
+
+	switch (rev & 0xfc) {
+	case 0x9c:
+		ddata->blizzard_ver = BLIZZARD_VERSION_S1D13744;
+		dev_info(&dssdev->dev, "s1d13744 LCD controller rev %d "
+			"initialized (CNF pins %x)\n", rev & 0x03, conf & 0x07);
+		break;
+	case 0xa4:
+		ddata->blizzard_ver = BLIZZARD_VERSION_S1D13745;
+		dev_info(&dssdev->dev, "s1d13745 LCD controller rev %d "
+			"initialized (CNF pins %x)\n", rev & 0x03, conf & 0x07);
+		break;
+	default:
+		dev_err(&dssdev->dev, "invalid s1d1374x revision %02x\n", rev);
+		r = -ENODEV;
+		goto err_inv_chip;
+	}
+
+	l = blizzard_read_reg(BLIZZARD_POWER_SAVE);
+	/* Standby, Sleep */
+	l &= ~0x03;
+	blizzard_write_reg(BLIZZARD_POWER_SAVE, l);
+	l = blizzard_read_reg(BLIZZARD_PLL_MODE);
+	l &= ~0x03;
+	/* Enable PLL, counter function */
+	l |= 0x1;
+	blizzard_write_reg(BLIZZARD_PLL_MODE, l);
+
+	while (!(blizzard_read_reg(BLIZZARD_PLL_DIV) & (1 << 7)))
+		msleep(1);
+
+	blizzard_write_reg(BLIZZARD_DISPLAY_MODE, 0x01);
+
 	return 0;
 
 err_inv_panel:
@@ -363,11 +389,11 @@ err_inv_panel:
 	 * with the initialization sequence, and we fail to init the panel if we
 	 * have turned it off
 	 */
-	/* gpio_direction_output(bdata->panel_reset, 0); */
+	/* gpio_set_value(bdata->panel_reset, 0); */
 err_inv_chip:
 	omapdss_rfbi_display_disable(dssdev);
 err_rfbi_en:
-	gpio_direction_output(bdata->ctrl_pwrdown, 0);
+	gpio_set_value(bdata->ctrl_pwrdown, 0);
 	return r;
 }
 
@@ -388,8 +414,9 @@ static void n8x0_panel_power_off(struct omap_dss_device *dssdev)
 	 * with the initialization sequence, and we fail to init the panel if we
 	 * have turned it off
 	 */
-	/* gpio_direction_output(bdata->panel_reset, 0); */
-	gpio_direction_output(bdata->ctrl_pwrdown, 0);
+	/* gpio_set_value(bdata->panel_reset, 0); */
+	gpio_set_value(bdata->ctrl_pwrdown, 0);
+	bdata->platform_disable(dssdev);
 	omapdss_rfbi_display_disable(dssdev);
 }
 
@@ -416,8 +443,6 @@ static int n8x0_panel_probe(struct omap_dss_device *dssdev)
 	struct panel_drv_data *ddata;
 	int r;
 
-	dev_dbg(&dssdev->dev, "probe\n");
-
 	if (!bdata)
 		return -EINVAL;
 
@@ -429,20 +454,21 @@ static int n8x0_panel_probe(struct omap_dss_device *dssdev)
 
 	dssdev->panel.timings.x_res = 800;
 	dssdev->panel.timings.y_res = 480;
+	dssdev->panel.timings.pixel_clock = 21940;
 	dssdev->ctrl.pixel_size = 16;
 	dssdev->ctrl.rfbi_timings = n8x0_panel_timings;
 	dssdev->caps = OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE;
 
 	if (gpio_is_valid(bdata->panel_reset)) {
 		r = devm_gpio_request_one(&dssdev->dev, bdata->panel_reset,
-				GPIOF_OUT_INIT_LOW, "PANEL RESET");
+				GPIOF_OUT_INIT_HIGH, "PANEL RESET");
 		if (r)
 			return r;
 	}
 
 	if (gpio_is_valid(bdata->ctrl_pwrdown)) {
 		r = devm_gpio_request_one(&dssdev->dev, bdata->ctrl_pwrdown,
-				GPIOF_OUT_INIT_LOW, "PANEL PWRDOWN");
+				GPIOF_OUT_INIT_HIGH, "PANEL PWRDOWN");
 		if (r)
 			return r;
 	}
@@ -537,7 +563,7 @@ static int n8x0_panel_update(struct omap_dss_device *dssdev,
 
 	blizzard_ctrl_setup_update(dssdev, x, y, w, h);
 
-	omap_rfbi_update(dssdev, update_done, NULL);
+	omap_rfbi_update(dssdev, update_done, dssdev);
 
 	mutex_unlock(&ddata->lock);
 
@@ -558,6 +584,19 @@ static int n8x0_panel_sync(struct omap_dss_device *dssdev)
 	return 0;
 }
 
+static void n8x0_panel_get_timings(struct omap_dss_device *dssdev,
+		struct omap_video_timings *timings)
+{
+	struct panel_drv_data *ddata = get_drv_data(dssdev);
+
+	mutex_lock(&ddata->lock);
+	dev_dbg(&dssdev->dev, "%s: %dx%d pixclock=%d\n", __func__, dssdev->panel.timings.x_res, dssdev->panel.timings.y_res,
+			dssdev->panel.timings.pixel_clock);
+	*timings = dssdev->panel.timings;
+	mutex_unlock(&ddata->lock);
+}
+
+
 static struct omap_dss_driver n8x0_panel_driver = {
 	.probe		= n8x0_panel_probe,
 	.remove		= n8x0_panel_remove,
@@ -571,9 +610,11 @@ static struct omap_dss_driver n8x0_panel_driver = {
 	.get_resolution	= n8x0_panel_get_resolution,
 	.get_recommended_bpp = omapdss_default_get_recommended_bpp,
 
-	.driver         = {
-		.name   = "n8x0_panel",
-		.owner  = THIS_MODULE,
+	.get_timings	= n8x0_panel_get_timings,
+
+	.driver		= {
+		.name	= "n8x0_panel",
+		.owner	= THIS_MODULE,
 	},
 };
 
