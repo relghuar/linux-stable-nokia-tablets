@@ -142,6 +142,7 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 
+#include <asm/mach-types.h>
 #include <asm/system_misc.h>
 
 #include "clock.h"
@@ -2632,6 +2633,19 @@ static int __init _setup(struct omap_hwmod *oh, void *data)
 {
 	if (oh->_state != _HWMOD_STATE_INITIALIZED)
 		return 0;
+
+	if (machine_is_nokia770() ||
+	    machine_is_nokia_n800() ||
+	    machine_is_nokia_n810() ||
+	    machine_is_nokia_n810_wimax()) {
+		/* Nokia N-series workaround: Don't reset any hwmod. Some drivers expect
+		 * the NOLO bootloader initializations to be effective. */
+		if ((strncmp(oh->name, "dss", 3) == 0) ||
+		    (strncmp(oh->name, "gpio1", 5) == 0)) {
+			oh->flags |= HWMOD_INIT_NO_RESET;
+			printk(KERN_INFO "Nokia N-series HWMOD_INIT_NO_RESET workaround enabled for %p'%s'\n", oh, oh->name);
+		}
+	}
 
 	_setup_iclk_autoidle(oh);
 
