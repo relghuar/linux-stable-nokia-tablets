@@ -26,6 +26,9 @@
 #include <linux/platform_data/mtd-onenand-omap2.h>
 #include <linux/mfd/menelaus.h>
 #include <sound/tlv320aic3x.h>
+#include <linux/spi/tsc2005.h>
+#include <linux/input.h>
+#include <linux/i2c/lm8323.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach-types.h>
@@ -35,6 +38,134 @@
 
 #include "mux.h"
 #include "gpmc-onenand.h"
+
+
+#define	RX44_TSC2005_RESET_GPIO	94
+#define	RX44_TSC2005_IRQ_GPIO	106
+
+#ifdef CONFIG_TOUCHSCREEN_TSC2005
+static struct tsc2005_platform_data tsc2005_config;
+static void rx44_tsc2005_set_reset(bool enable)
+{
+	gpio_set_value(RX44_TSC2005_RESET_GPIO, enable);
+}
+
+static struct omap2_mcspi_device_config tsc2005_mcspi_config = {
+	.turbo_mode	= 0,
+};
+#endif
+
+#define N800_KEYB_IRQ_GPIO		109
+
+static void __init n8x0_ts_set_config(void)
+{
+#ifdef CONFIG_TOUCHSCREEN_TSC2005
+	if (machine_is_nokia_n800()) {
+		tsc2005_config.ts_x_plate_ohm = 180;
+		tsc2005_config.ts_pressure_max = 2048;
+		tsc2005_config.ts_pressure_fudge = 2;
+		tsc2005_config.ts_x_max = 4096;
+		tsc2005_config.ts_x_fudge = 4;
+		tsc2005_config.ts_y_max = 4096;
+		tsc2005_config.ts_y_fudge = 7;
+		tsc2005_config.set_reset = rx44_tsc2005_set_reset;
+	} else if (machine_is_nokia_n810()) {
+		tsc2005_config.ts_x_plate_ohm = 280;
+		tsc2005_config.ts_pressure_max = 2048;
+		tsc2005_config.ts_pressure_fudge = 2;
+		tsc2005_config.ts_x_max = 4096;
+		tsc2005_config.ts_x_fudge = 4;
+		tsc2005_config.ts_y_max = 4096;
+		tsc2005_config.ts_y_fudge = 7;
+		tsc2005_config.set_reset = rx44_tsc2005_set_reset;
+	} else {
+		printk(KERN_ERR "Unknown panel type, set default "
+		       "touchscreen configuration\n");
+		tsc2005_config.ts_x_plate_ohm = 200;
+	}
+#endif
+}
+
+/* We map the FN key as LALT to workaround an X keycode problem.
+ * The XKB map needs to be adjusted to support this. */
+#define MAP_FN_AS_LEFTALT
+
+static s16 rx44_keymap[LM8323_KEYMAP_SIZE] = {
+	[0x01] = KEY_Q,
+	[0x02] = KEY_K,
+	[0x03] = KEY_O,
+	[0x04] = KEY_P,
+	[0x05] = KEY_BACKSPACE,
+	[0x06] = KEY_A,
+	[0x07] = KEY_S,
+	[0x08] = KEY_D,
+	[0x09] = KEY_F,
+	[0x0a] = KEY_G,
+	[0x0b] = KEY_H,
+	[0x0c] = KEY_J,
+
+	[0x11] = KEY_W,
+	[0x12] = KEY_F4,
+	[0x13] = KEY_L,
+	[0x14] = KEY_APOSTROPHE,
+	[0x16] = KEY_Z,
+	[0x17] = KEY_X,
+	[0x18] = KEY_C,
+	[0x19] = KEY_V,
+	[0x1a] = KEY_B,
+	[0x1b] = KEY_N,
+	[0x1c] = KEY_LEFTSHIFT, /* Actually, this is both shift keys */
+	[0x1f] = KEY_F7,
+
+	[0x21] = KEY_E,
+	[0x22] = KEY_SEMICOLON,
+	[0x23] = KEY_MINUS,
+	[0x24] = KEY_EQUAL,
+#ifdef MAP_FN_AS_LEFTALT
+	[0x2b] = KEY_LEFTALT,
+#else
+	[0x2b] = KEY_FN,
+#endif
+	[0x2c] = KEY_M,
+	[0x2f] = KEY_F8,
+
+	[0x31] = KEY_R,
+	[0x32] = KEY_RIGHTCTRL,
+	[0x34] = KEY_SPACE,
+	[0x35] = KEY_COMMA,
+	[0x37] = KEY_UP,
+	[0x3c] = KEY_COMPOSE,
+	[0x3f] = KEY_F6,
+
+	[0x41] = KEY_T,
+	[0x44] = KEY_DOT,
+	[0x46] = KEY_RIGHT,
+	[0x4f] = KEY_F5,
+	[0x51] = KEY_Y,
+	[0x53] = KEY_DOWN,
+	[0x55] = KEY_ENTER,
+	[0x5f] = KEY_ESC,
+
+	[0x61] = KEY_U,
+	[0x64] = KEY_LEFT,
+
+	[0x71] = KEY_I,
+	[0x75] = KEY_KPENTER,
+};
+
+static struct lm8323_platform_data lm8323_pdata = {
+	.repeat		= 0, /* Repeat is handled in userspace for now. */
+	.keymap		= rx44_keymap,
+	.size_x		= 8,
+	.size_y		= 12,
+	.debounce_time	= 12,
+	.active_time	= 500,
+
+	.name		= "Internal keyboard",
+	.pwm_names[0] 	= "n810::keyboard",
+	.pwm_names[1] 	= "n810::cover",
+};
+
 
 #define TUSB6010_ASYNC_CS	1
 #define TUSB6010_SYNC_CS	4
@@ -61,16 +192,24 @@ static struct i2c_board_info n8x0_i2c_board_info_3[] __initdata = {
 	{
 		I2C_BOARD_INFO("retu-mfd", 0x01),
 	},
+	{
+		I2C_BOARD_INFO("tahvo-mfd", 0x02),
+	},
 };
 
 static void __init n8x0_cbus_init(void)
 {
 	const int retu_irq_gpio = 108;
+	const int tahvo_irq_gpio = 111;
 
-	if (gpio_request_one(retu_irq_gpio, GPIOF_IN, "Retu IRQ"))
+	if (gpio_request_one(retu_irq_gpio, GPIOF_IN, "Retu/Vilma IRQ"))
+		return;
+	if (gpio_request_one(tahvo_irq_gpio, GPIOF_IN, "Tahvo/Betty IRQ"))
 		return;
 	irq_set_irq_type(gpio_to_irq(retu_irq_gpio), IRQ_TYPE_EDGE_RISING);
+	irq_set_irq_type(gpio_to_irq(tahvo_irq_gpio), IRQ_TYPE_EDGE_RISING);
 	n8x0_i2c_board_info_3[0].irq = gpio_to_irq(retu_irq_gpio);
+	n8x0_i2c_board_info_3[1].irq = gpio_to_irq(tahvo_irq_gpio);
 	i2c_register_board_info(3, n8x0_i2c_board_info_3,
 				ARRAY_SIZE(n8x0_i2c_board_info_3));
 	platform_device_register(&n8x0_cbus_device);
@@ -168,11 +307,22 @@ static void __init n8x0_usb_init(void) {}
 #endif /*CONFIG_USB_MUSB_TUSB6010 */
 
 
+static struct omap2_mcspi_device_config mipid_mcspi_config = {
+	.turbo_mode	= 0,
+};
+
 static struct omap2_mcspi_device_config p54spi_mcspi_config = {
 	.turbo_mode	= 0,
 };
 
-static struct spi_board_info n800_spi_board_info[] __initdata = {
+static struct spi_board_info n8x0_common_spi_board_info[] __initdata = {
+	{
+		.modalias       = "lcd_mipid",
+		.bus_num        = 1,
+		.chip_select    = 1,
+		.max_speed_hz   = 4000000,
+		.controller_data= &mipid_mcspi_config,
+	},
 	{
 		.modalias	= "p54spi",
 		.bus_num	= 2,
@@ -180,6 +330,22 @@ static struct spi_board_info n800_spi_board_info[] __initdata = {
 		.max_speed_hz   = 48000000,
 		.controller_data = &p54spi_mcspi_config,
 	},
+};
+
+static struct spi_board_info n810_spi_board_info[] __initdata = {
+#ifdef CONFIG_TOUCHSCREEN_TSC2005
+	{
+		.modalias        = "tsc2005",
+		.bus_num         = 1,
+		.chip_select     = 0,
+		.max_speed_hz    = 6000000,
+		.controller_data = &tsc2005_mcspi_config,
+		.platform_data   = &tsc2005_config,
+	},
+#endif
+};
+
+static struct spi_board_info n800_spi_board_info[] __initdata = {
 };
 
 #if defined(CONFIG_MTD_ONENAND_OMAP2) || \
@@ -649,6 +815,10 @@ static struct aic3x_pdata n810_aic33_data __initdata = {
 
 static struct i2c_board_info n810_i2c_board_info_2[] __initdata = {
 	{
+		I2C_BOARD_INFO("lm8323", 0x45),
+		.platform_data  = &lm8323_pdata,
+	},
+	{
 		I2C_BOARD_INFO("tlv320aic3x", 0x18),
 		.platform_data = &n810_aic33_data,
 	},
@@ -705,21 +875,34 @@ static inline void board_serial_init(void)
 static void __init n8x0_init_machine(void)
 {
 	omap2420_mux_init(board_mux, OMAP_PACKAGE_ZAC);
+	n8x0_cbus_init();
 	/* FIXME: add n810 spi devices */
-	spi_register_board_info(n800_spi_board_info,
-				ARRAY_SIZE(n800_spi_board_info));
+	n8x0_ts_set_config();
+	spi_register_board_info(n8x0_common_spi_board_info,
+				ARRAY_SIZE(n8x0_common_spi_board_info));
+	if (machine_is_nokia_n800()) {
+		spi_register_board_info(n800_spi_board_info,
+					ARRAY_SIZE(n800_spi_board_info));
+	} else {
+#ifdef CONFIG_TOUCHSCREEN_TSC2005
+		n810_spi_board_info[0].irq = gpio_to_irq(RX44_TSC2005_IRQ_GPIO);
+#endif
+		spi_register_board_info(n810_spi_board_info,
+					ARRAY_SIZE(n810_spi_board_info));
+	}
 	omap_register_i2c_bus(1, 400, n8x0_i2c_board_info_1,
 			      ARRAY_SIZE(n8x0_i2c_board_info_1));
 	omap_register_i2c_bus(2, 400, NULL, 0);
-	if (machine_is_nokia_n810())
+	if (machine_is_nokia_n810()) {
+		n810_i2c_board_info_2[0].irq = gpio_to_irq(N800_KEYB_IRQ_GPIO);
 		i2c_register_board_info(2, n810_i2c_board_info_2,
 					ARRAY_SIZE(n810_i2c_board_info_2));
+	}
 	board_serial_init();
 	omap_sdrc_init(NULL, NULL);
 	gpmc_onenand_init(board_onenand_data);
 	n8x0_mmc_init();
 	n8x0_usb_init();
-	n8x0_cbus_init();
 }
 
 MACHINE_START(NOKIA_N800, "Nokia N800")
