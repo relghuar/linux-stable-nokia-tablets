@@ -750,6 +750,11 @@ int check_fb_var(struct fb_info *fbi, struct fb_var_screeninfo *var)
 		var->vmode = FB_VMODE_NONINTERLACED;
 	}
 
+	DBG("%s: res=%dx%d vres=%dx%d wh=%dx%d margin=(%d,%d)-(%d,%d) pixclock=%d hsl=%d vsl=%d sync=%d vmode=%d\n", __func__,
+			var->xres, var->yres, var->xres_virtual, var->yres_virtual, var->width, var->height,
+			var->left_margin, var->upper_margin, var->right_margin, var->lower_margin,
+			var->pixclock, var->hsync_len, var->vsync_len, var->sync, var->vmode);
+
 	return 0;
 }
 
@@ -1754,6 +1759,8 @@ static int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 		return 0;
 	}
 
+	DBG("%s\n", __func__);
+
 	var->nonstd = 0;
 	var->bits_per_pixel = 0;
 
@@ -2547,6 +2554,9 @@ static int omapfb_probe(struct platform_device *pdev)
 					"display\n");
 			goto cleanup;
 		}
+		r = omapfb_fb_init(fbdev, fbdev->fbs[0]);
+		omapfb_set_par(fbdev->fbs[0]);
+		DBG("%s: default display initialized\n", __func__);
 	}
 
 	DBG("create sysfs for fbs\n");
