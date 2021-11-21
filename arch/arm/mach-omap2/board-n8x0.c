@@ -154,7 +154,7 @@ static struct omap2_mcspi_device_config p54spi_mcspi_config = {
 static struct spi_board_info n800_spi_board_info[] __initdata = {
 	{
 		.modalias	= "p54spi",
-		.bus_num	= 2,
+		.bus_num	= 1,
 		.chip_select	= 0,
 		.max_speed_hz   = 48000000,
 		.controller_data = &p54spi_mcspi_config,
