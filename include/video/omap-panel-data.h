@@ -79,4 +79,15 @@ struct panel_acx565akm_platform_data {
 	int datapairs;
 };
 
+/**
+ * panel_n8x0 plaftorm data - N8x0 panel driver configuration data
+ */
+struct panel_n8x0_platform_data {
+	const char *name;
+	const char *source;
+
+	int reset_gpio;
+	int powerdown_gpio;
+};
+
 #endif /* __OMAP_PANEL_DATA_H */
