@@ -568,6 +568,43 @@ struct omapdss_hdmi_ops {
 		const struct hdmi_avi_infoframe *avi);
 };
 
+struct omapdss_rfbi_ops {
+	int (*connect)(struct omap_dss_device *dssdev,
+			struct omap_dss_device *dst);
+	void (*disconnect)(struct omap_dss_device *dssdev,
+			struct omap_dss_device *dst);
+
+	int (*enable)(struct omap_dss_device *dssdev);
+	void (*disable)(struct omap_dss_device *dssdev);
+
+	int (*check_timings)(struct omap_dss_device *dssdev,
+			struct omap_video_timings *timings);
+	void (*set_timings)(struct omap_dss_device *dssdev,
+			struct omap_video_timings *timings);
+	void (*get_timings)(struct omap_dss_device *dssdev,
+			struct omap_video_timings *timings);
+
+	int (*enable_te)(struct omap_dss_device *dssdev, bool enable, unsigned line);
+
+	int (*update)(struct omap_dss_device *dssdev,
+			void (*callback)(void *), void *data);
+
+	void (*set_pixel_size)(struct omap_dss_device *dssdev, int pixel_size);
+	void (*set_data_lines)(struct omap_dss_device *dssdev, int data_lines);
+	void (*set_rfbi_timings)(struct omap_dss_device *dssdev,
+			const struct rfbi_timings *timings);
+
+	int (*configure)(struct omap_dss_device *dssdev);
+
+	void (*bus_lock)(struct omap_dss_device *dssdev);
+	void (*bus_unlock)(struct omap_dss_device *dssdev);
+
+	void (*write_command)(struct omap_dss_device *dssdev, const void *buf, u32 len);
+	void (*read_data)(struct omap_dss_device *dssdev, void *buf, u32 len);
+	void (*write_data)(struct omap_dss_device *dssdev, const void *buf, u32 len);
+
+};
+
 struct omapdss_dsi_ops {
 	int (*connect)(struct omap_dss_device *dssdev,
 			struct omap_dss_device *dst);
@@ -691,6 +728,7 @@ struct omap_dss_device {
 		const struct omapdss_hdmi_ops *hdmi;
 		const struct omapdss_atv_ops *atv;
 		const struct omapdss_dsi_ops *dsi;
+		const struct omapdss_rfbi_ops *rfbi;
 	} ops;
 
 	/* helper variable for driver suspend/resume */
@@ -782,9 +820,6 @@ typedef void (*omap_dispc_isr_t) (void *arg, u32 mask);
 
 enum omapdss_version omapdss_get_version(void);
 bool omapdss_is_initialized(void);
-
-int omap_dss_register_driver(struct omap_dss_driver *);
-void omap_dss_unregister_driver(struct omap_dss_driver *);
 
 int omapdss_register_display(struct omap_dss_device *dssdev);
 void omapdss_unregister_display(struct omap_dss_device *dssdev);
