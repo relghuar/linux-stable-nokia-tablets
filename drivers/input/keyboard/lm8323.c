@@ -30,6 +30,7 @@
 #include <linux/delay.h>
 #include <linux/input.h>
 #include <linux/leds.h>
+#include <linux/gpio.h>
 #include <linux/platform_data/lm8323.h>
 #include <linux/pm.h>
 #include <linux/slab.h>
@@ -627,10 +628,107 @@ static ssize_t lm8323_set_disable(struct device *dev,
 }
 static DEVICE_ATTR(disable_kp, 0644, lm8323_show_disable, lm8323_set_disable);
 
+int lm8323_of_matrix_parse_keymap(struct device *dev, const char *propname,
+				  unsigned short *lm8323_keymap) {
+	int size;
+	int i;
+	int retval;
+	u32 *keys;
+
+	size = device_property_read_u32_array(dev, propname, NULL, 0);
+	if (size <= 0) {
+		dev_err(dev, "missing or malformed property %s: %d\n",
+			propname, size);
+		return size < 0 ? size : -EINVAL;
+	}
+
+	if (size > LM8323_KEYMAP_SIZE-1) {
+		dev_err(dev, "%s size overflow (%d vs max %u)\n",
+			propname, size, LM8323_KEYMAP_SIZE-1);
+		return -EINVAL;
+	}
+
+	keys = kmalloc_array(size, sizeof(u32), GFP_KERNEL);
+	if (!keys)
+		return -ENOMEM;
+
+	retval = device_property_read_u32_array(dev, propname, keys, size);
+	if (retval) {
+		dev_err(dev, "failed to read %s property: %d\n",
+			propname, retval);
+		goto out;
+	}
+
+	for (i = 0; i < size; i++) {
+		u8 kr, kc;
+		u16 scan;
+		kr = (keys[i] >> 24) & 0x07;
+		kc = (keys[i] >> 16) & 0x0f;
+		scan = keys[i] & 0xffff;
+		lm8323_keymap[ ((kr<<4) | kc) + 1 ] = scan;
+	}
+
+	retval = 0;
+
+out:
+	kfree(keys);
+	return retval;
+}
+
+struct lm8323_platform_data *lm8323_of_populate_pdata(struct device *dev)
+{
+	struct lm8323_platform_data *pdata;
+	int error, count;
+
+	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
+	if (!pdata)
+		return ERR_PTR(-ENOMEM);
+
+	pdata->keymap = devm_kzalloc(dev, LM8323_KEYMAP_SIZE, GFP_KERNEL);
+	if (!pdata->keymap)
+		return ERR_PTR(-ENOMEM);
+
+	device_property_read_u32(dev, "keypad,num-rows", &pdata->size_x);
+	device_property_read_u32(dev, "keypad,num-columns", &pdata->size_y);
+
+	if (pdata->size_x <= 0 || pdata->size_y <= 0) {
+		dev_err(dev, "number of keypad rows/columns not specified\n");
+		return ERR_PTR(-EINVAL);
+	}
+
+	error = lm8323_of_matrix_parse_keymap(dev, "linux,keymap", pdata->keymap);
+	if (error) {
+		dev_err(dev, "Failed to build Keymap (%d)\n", error);
+		return ERR_PTR(error);
+	}
+
+	device_property_read_string(dev, "label", &pdata->name);
+	device_property_read_u32(dev, "debounce-ms", &pdata->debounce_time);
+	device_property_read_u32(dev, "active-ms", &pdata->active_time);
+	pdata->repeat = device_property_read_bool(dev, "repeat");
+
+	count = device_property_read_string_array(dev, "pwm-names", NULL, 0);
+	if (count > LM8323_NUM_PWMS) {
+		dev_warn(dev, "too many pwm-names specified: %d (max. %d)\n",
+			 count, LM8323_NUM_PWMS);
+		count = LM8323_NUM_PWMS;
+	}
+	if (count > 0) {
+		error = device_property_read_string_array(dev, "pwm-names",
+						      pdata->pwm_names, count);
+		if (error < 0)
+			dev_warn(dev, "error reading pwm-names from OF (%d)\n",
+				 error);
+	}
+
+	return pdata;
+}
+
 static int lm8323_probe(struct i2c_client *client,
 				  const struct i2c_device_id *id)
 {
 	struct lm8323_platform_data *pdata = dev_get_platdata(&client->dev);
+	struct device_node *np = client->dev.of_node;
 	struct input_dev *idev;
 	struct lm8323_chip *lm;
 	int pwm;
@@ -638,8 +736,16 @@ static int lm8323_probe(struct i2c_client *client,
 	unsigned long tmo;
 	u8 data[2];
 
+	if (!pdata) {
+		if (np) {
+			pdata = lm8323_of_populate_pdata(&client->dev);
+			if (IS_ERR(pdata))
+				return PTR_ERR(pdata);
+		}
+	}
+
 	if (!pdata || !pdata->size_x || !pdata->size_y) {
-		dev_err(&client->dev, "missing platform_data\n");
+		dev_err(&client->dev, "missing platform_data or OF attributes\n");
 		return -EINVAL;
 	}
 
@@ -838,10 +944,22 @@ static const struct i2c_device_id lm8323_id[] = {
 	{ }
 };
 
+#ifdef CONFIG_OF
+static const struct of_device_id of_lm8323_keyboard_match[] = {
+	{ .compatible = "ti,lm8323", },
+	{},
+};
+
+MODULE_DEVICE_TABLE(of, of_lm8323_keyboard_match);
+#endif
+
 static struct i2c_driver lm8323_i2c_driver = {
 	.driver = {
 		.name	= "lm8323",
 		.pm	= &lm8323_pm_ops,
+#ifdef CONFIG_OF
+		.of_match_table = of_match_ptr(of_lm8323_keyboard_match),
+#endif
 	},
 	.probe		= lm8323_probe,
 	.remove		= lm8323_remove,
