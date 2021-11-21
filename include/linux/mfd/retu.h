@@ -14,6 +14,9 @@ struct retu_dev;
 int retu_read(struct retu_dev *, u8);
 int retu_write(struct retu_dev *, u8, u16);
 
+struct retu_dev* retu_get_dev_retu(void);
+struct retu_dev* retu_get_dev_tahvo(void);
+
 /* Registers */
 #define RETU_REG_WATCHDOG	0x17		/* Watchdog */
 #define RETU_REG_CC1		0x0d		/* Common control register 1 */

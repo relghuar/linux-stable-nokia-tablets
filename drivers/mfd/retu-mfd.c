@@ -140,6 +140,19 @@ static const struct retu_data {
 	}
 };
 
+static struct retu_dev *retu_dev_retu;
+static struct retu_dev *retu_dev_tahvo;
+
+struct retu_dev *retu_get_dev_retu() {
+	WARN_ON(retu_dev_retu == NULL);
+	return retu_dev_retu;
+}
+
+struct retu_dev *retu_get_dev_tahvo() {
+	WARN_ON(retu_dev_tahvo == NULL);
+	return retu_dev_tahvo;
+}
+
 int retu_read(struct retu_dev *rdev, u8 reg)
 {
 	int ret;
@@ -283,6 +296,11 @@ static int retu_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 		retu_pm_power_off = rdev;
 		pm_power_off	  = retu_power_off;
 	}
+
+	if (strcmp(rdat->chip_name, "Retu") == 0)
+		retu_dev_retu = rdev;
+	else if (strcmp(rdat->chip_name, "Tahvo") == 0)
+		retu_dev_tahvo = rdev;
 
 	return 0;
 }
