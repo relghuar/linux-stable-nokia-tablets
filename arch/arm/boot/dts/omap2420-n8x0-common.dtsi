@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 #include "omap2420.dtsi"
+#include <dt-bindings/input/input.h>
 
 / {
 	memory@80000000 {
@@ -26,7 +27,27 @@
 				interrupts = <12 IRQ_TYPE_EDGE_RISING>;
 				reg = <0x1>;
 			};
+			tahvo: tahvo@2 {
+				compatible = "nokia,tahvo";
+				interrupt-parent = <&gpio4>;
+				interrupts = <15 IRQ_TYPE_EDGE_RISING>;
+				reg = <0x2>;
+			};
 		};
+	};
+
+	vio_ape: vio_ape {
+		compatible = "regulator-fixed";
+		regulator-name = "vio_ape";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+	};
+
+	v28_aic: v28_aic {
+		compatible = "regulator-fixed";
+		regulator-name = "v28_aic";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
 	};
 };
 
@@ -36,12 +57,192 @@
 	pmic@72 {
 		compatible = "menelaus";
 		reg = <0x72>;
+		interrupt-parent = <&intc>;
 		interrupts = <7 IRQ_TYPE_EDGE_RISING>;
+	};
+};
+
+&omap2420_pmx {
+	mcbsp2_pins: mcbsp2_pins {
+		pinctrl-single,pins = <
+			OMAP2420_CORE_IOPAD(0x0124, PIN_INPUT | MUX_MODE1)	/* eac_ac_sclk.mcbsp2_clkx */
+			OMAP2420_CORE_IOPAD(0x0125, PIN_INPUT | MUX_MODE1)	/* eac_ac_fs.mcbsp2_fsx */
+			OMAP2420_CORE_IOPAD(0x0126, PIN_INPUT | MUX_MODE1)	/* eac_ac_din.mcbsp2_dr */
+			OMAP2420_CORE_IOPAD(0x0127, PIN_OUTPUT | MUX_MODE1)	/* eac_ac_dout.mcbsp2_dx */
+		>;
+	};
+
+	aic33_pins: aic33_pins {
+		pinctrl-single,pins = <
+			OMAP2420_CORE_IOPAD(0x0129, PIN_OUTPUT | MUX_MODE3)	/* eac_ac_rst.gpio118 */
+			OMAP2420_CORE_IOPAD(0x00e8, PIN_OUTPUT | MUX_MODE2)	/* vlynq_tx1.sys_clkout2 */
+		>;
+	};
+
+	n8x0_panel_pins: pinmux_n8x0_panel_pins {
+		pinctrl-single,pins = <
+			OMAP2420_CORE_IOPAD(0x0098, PIN_OUTPUT | MUX_MODE3)	/* N8X0_LCD_RESET_GPIO, gpmc_nbe1.gpio_30 */
+			OMAP2420_CORE_IOPAD(0x00e7, PIN_OUTPUT | MUX_MODE3)	/* N8X0_POWERDOWN_GPIO, vlynq_rx0.gpio_15 */
+		>;
+	};
+	dss_rfbi_pins: pinmux_dss_rfbi_pins {
+		pinctrl-single,pins = <
+			OMAP2420_CORE_IOPAD(0x00b3, PIN_OUTPUT | MUX_MODE0)	/* dss_d0 */
+			OMAP2420_CORE_IOPAD(0x00b4, PIN_OUTPUT | MUX_MODE0)	/* dss_d1 */
+			OMAP2420_CORE_IOPAD(0x00b5, PIN_OUTPUT | MUX_MODE0)	/* dss_d2 */
+			OMAP2420_CORE_IOPAD(0x00b6, PIN_OUTPUT | MUX_MODE0)	/* dss_d3 */
+			OMAP2420_CORE_IOPAD(0x00b7, PIN_OUTPUT | MUX_MODE0)	/* dss_d4 */
+			OMAP2420_CORE_IOPAD(0x00b8, PIN_OUTPUT | MUX_MODE0)	/* dss_d5 */
+			OMAP2420_CORE_IOPAD(0x00b9, PIN_OUTPUT | MUX_MODE0)	/* dss_d6 */
+			OMAP2420_CORE_IOPAD(0x00ba, PIN_OUTPUT | MUX_MODE0)	/* dss_d7 */
+			OMAP2420_CORE_IOPAD(0x00bb, PIN_OUTPUT | MUX_MODE0)	/* dss_d8 */
+			OMAP2420_CORE_IOPAD(0x00bc, PIN_OUTPUT | MUX_MODE0)	/* dss_d9 */
+			OMAP2420_CORE_IOPAD(0x00bd, PIN_OUTPUT | MUX_MODE0)	/* dss_d10 */
+			OMAP2420_CORE_IOPAD(0x00be, PIN_OUTPUT | MUX_MODE0)	/* dss_d11 */
+			OMAP2420_CORE_IOPAD(0x00bf, PIN_OUTPUT | MUX_MODE0)	/* dss_d12 */
+			OMAP2420_CORE_IOPAD(0x00c0, PIN_OUTPUT | MUX_MODE0)	/* dss_d13 */
+			OMAP2420_CORE_IOPAD(0x00c1, PIN_OUTPUT | MUX_MODE0)	/* dss_d14 */
+			OMAP2420_CORE_IOPAD(0x00c2, PIN_OUTPUT | MUX_MODE0)	/* dss_d15 */
+			OMAP2420_CORE_IOPAD(0x00c3, PIN_OUTPUT | MUX_MODE0)	/* dss_d16 */
+			OMAP2420_CORE_IOPAD(0x00cb, PIN_OUTPUT | MUX_MODE0)	/* dss_pclk/rdx */
+			OMAP2420_CORE_IOPAD(0x00cc, PIN_OUTPUT | MUX_MODE0)	/* dss_vsync/wrx */
+			OMAP2420_CORE_IOPAD(0x00cd, PIN_OUTPUT | MUX_MODE0)	/* dss_hsync/csx */
+			OMAP2420_CORE_IOPAD(0x00ce, PIN_OUTPUT | MUX_MODE0)	/* dss_acbias/data_en/cmd */
+		>;
 	};
 };
 
 &i2c2 {
 	clock-frequency = <400000>;
+
+	aic33@18 {
+		compatible = "ti,tlv320aic33";
+		reg = <0x18>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&aic33_pins>;
+
+		gpio-reset = <&gpio4 22 GPIO_ACTIVE_LOW>; /* gpio118 */
+
+		ai3x-gpio-func = <
+			10 /* AIC3X_GPIO1_FUNC_DIGITAL_MIC_MODCLK */
+			5 /* AIC3X_GPIO2_FUNC_DIGITAL_MIC_INPUT */
+		>;
+		ai3x-micbias-vg = <1>; /* 2V */
+
+		AVDD-supply = <&v28_aic>;
+		DRVDD-supply = <&v28_aic>;
+		IOVDD-supply = <&vio_ape>;
+		DVDD-supply = <&vio_ape>;
+
+		assigned-clocks = <&sys_clkout2_src>, <&sys_clkout2>;
+		assigned-clock-parents = <&func_96m_ck>;
+		assigned-clock-rates = <0>, <12000000>;
+	};
+
+	lm8323@45 {
+		compatible = "ti,lm8323";
+		reg = <0x45>;
+		interrupts-extended = <&gpio4 13 IRQ_TYPE_LEVEL_LOW>; // gpio109
+
+		label = "Internal keyboard";
+		pwm-names = "n810::keyboard", "n810::cover";
+
+		repeat = <0>;  // Repeat is handled in userspace for now.
+		debounce-ms = <30>;
+		active-ms = <500>;
+
+		keypad,num-columns = <12>;
+		keypad,num-rows = <8>;
+
+		linux,keymap = <
+			MATRIX_KEY(0x00, 0x00, KEY_Q)
+			MATRIX_KEY(0x00, 0x01, KEY_K)
+			MATRIX_KEY(0x00, 0x02, KEY_O)
+			MATRIX_KEY(0x00, 0x03, KEY_P)
+			MATRIX_KEY(0x00, 0x04, KEY_BACKSPACE)
+			MATRIX_KEY(0x00, 0x05, KEY_A)
+			MATRIX_KEY(0x00, 0x06, KEY_S)
+			MATRIX_KEY(0x00, 0x07, KEY_D)
+			MATRIX_KEY(0x00, 0x08, KEY_F)
+			MATRIX_KEY(0x00, 0x09, KEY_G)
+			MATRIX_KEY(0x00, 0x0a, KEY_H)
+			MATRIX_KEY(0x00, 0x0b, KEY_J)
+
+			MATRIX_KEY(0x01, 0x00, KEY_W)
+			MATRIX_KEY(0x01, 0x01, KEY_F4)
+			MATRIX_KEY(0x01, 0x02, KEY_L)
+			MATRIX_KEY(0x01, 0x03, KEY_APOSTROPHE)
+			MATRIX_KEY(0x01, 0x05, KEY_Z)
+			MATRIX_KEY(0x01, 0x06, KEY_X)
+			MATRIX_KEY(0x01, 0x07, KEY_C)
+			MATRIX_KEY(0x01, 0x08, KEY_V)
+			MATRIX_KEY(0x01, 0x09, KEY_B)
+			MATRIX_KEY(0x01, 0x0a, KEY_N)
+			MATRIX_KEY(0x01, 0x0b, KEY_LEFTSHIFT) // Actually, this is both shift keys
+			MATRIX_KEY(0x01, 0x0e, KEY_F7)
+
+			MATRIX_KEY(0x02, 0x00, KEY_E)
+			MATRIX_KEY(0x02, 0x01, KEY_SEMICOLON)
+			MATRIX_KEY(0x02, 0x02, KEY_MINUS)
+			MATRIX_KEY(0x02, 0x03, KEY_EQUAL)
+			MATRIX_KEY(0x02, 0x0a, KEY_LEFTALT) // FN as Left-Alt
+			// MATRIX_KEY(0x02, 0x0a, KEY_FN) // Normal FN
+			MATRIX_KEY(0x02, 0x0b, KEY_M)
+			MATRIX_KEY(0x02, 0x0e, KEY_F8)
+
+			MATRIX_KEY(0x03, 0x00, KEY_R)
+			MATRIX_KEY(0x03, 0x01, KEY_RIGHTCTRL)
+			MATRIX_KEY(0x03, 0x03, KEY_SPACE)
+			MATRIX_KEY(0x03, 0x04, KEY_COMMA)
+			MATRIX_KEY(0x03, 0x06, KEY_UP)
+			MATRIX_KEY(0x03, 0x0b, KEY_COMPOSE)
+			MATRIX_KEY(0x03, 0x0e, KEY_F6)
+
+			MATRIX_KEY(0x04, 0x00, KEY_T)
+			MATRIX_KEY(0x04, 0x03, KEY_DOT)
+			MATRIX_KEY(0x04, 0x05, KEY_RIGHT)
+			MATRIX_KEY(0x04, 0x0e, KEY_F5)
+
+			MATRIX_KEY(0x05, 0x00, KEY_Y)
+			MATRIX_KEY(0x05, 0x02, KEY_DOWN)
+			MATRIX_KEY(0x05, 0x04, KEY_ENTER)
+			MATRIX_KEY(0x05, 0x0e, KEY_ESC)
+
+			MATRIX_KEY(0x06, 0x00, KEY_U)
+			MATRIX_KEY(0x06, 0x03, KEY_LEFT)
+
+			MATRIX_KEY(0x07, 0x00, KEY_I)
+			MATRIX_KEY(0x07, 0x04, KEY_KPENTER)
+			>;
+	};
+
+	lp5521@32 {
+		compatible = "national,lp5521";
+		reg = <0x32>;
+		clock-mode = /bits/ 8 <2>;
+		label = "rgb";
+		enable-gpio = <&gpio1 24 GPIO_ACTIVE_HIGH>;
+		interrupts = <&gpio1 27 IRQ_TYPE_EDGE_RISING>;
+		chan0 {
+			chan-name = "red";
+			led-cur = /bits/ 8 <0x2f>;
+			max-cur = /bits/ 8 <0x5f>;
+			linux,default-trigger = "panic";
+		};
+		chan1 {
+			chan-name = "green";
+			led-cur = /bits/ 8 <0x2f>;
+			max-cur = /bits/ 8 <0x5f>;
+		};
+		chan2 {
+			chan-name = "blue";
+			led-cur = /bits/ 8 <0x2f>;
+			max-cur = /bits/ 8 <0x5f>;
+			linux,default-trigger = "heartbeat";
+		};
+
+	};
 };
 
 &gpmc {
@@ -108,4 +309,87 @@
 			reg = <0x00000000 0x10000000>;
 		};
 	};
+};
+
+&gpio1 {
+	ti,no-reset-on-init;
+};
+
+&dss {
+	status = "okay";
+	ti,no-reset-on-init;
+};
+
+&dispc {
+	ti,no-reset-on-init;
+};
+
+&rfbi {
+	status = "okay";
+	ti,no-reset-on-init;
+	pinctrl-names = "default";
+	pinctrl-0 = <&dss_rfbi_pins>;
+
+	port {
+		rfbi_out: endpoint {
+			remote-endpoint = <&lcd_in>;
+			data-lines = <24>;
+		};
+	};
+};
+
+&mcspi1 {
+	status = "okay";
+	ti,spi-num-cs = <2>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+	tsc2005@0 {
+		compatible = "ti,tsc2005";
+		spi-max-frequency = <6000000>;
+		reg = <0>;
+
+		vio-supply = <&vio_ape>;
+
+		reset-gpios = <&gpio3 30 GPIO_ACTIVE_HIGH>; /* 94 */
+		interrupts-extended = <&gpio4 10 IRQ_TYPE_EDGE_RISING>; /* 106 */
+
+		touchscreen-fuzz-x = <4>;
+		touchscreen-fuzz-y = <7>;
+		touchscreen-fuzz-pressure = <2>;
+		touchscreen-size-x = <4096>;
+		touchscreen-size-y = <4096>;
+		touchscreen-max-pressure = <2048>;
+
+		ti,x-plate-ohms = <280>;
+		ti,esd-recovery-timeout-ms = <8000>;
+	};
+
+	lcd: n8x0_panel@1 {
+		compatible = "omapdss,nokia,n8x0_panel";
+		spi-max-frequency = <4000000>;
+		reg = <1>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&n8x0_panel_pins>;
+
+		clocks = <&osc_ck>;
+		clock-names = "osc_ck";
+
+		label = "lcd";
+		reset-gpios = <&gpio1 30 GPIO_ACTIVE_HIGH>; /* 30 */
+		powerdown-gpio = <&gpio1 15 GPIO_ACTIVE_HIGH>; /* 15 */
+
+		port {
+			lcd_in: endpoint {
+				remote-endpoint = <&rfbi_out>;
+			};
+		};
+	};
+};
+
+&mcbsp2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mcbsp2_pins>;
+
+	status = "okay";
 };
