@@ -899,7 +899,7 @@ fail:
 static int menelaus_read_time(struct device *dev, struct rtc_time *t)
 {
 	struct i2c_msg	msg[2];
-	char		regs[7];
+	char		regs[8];
 	int		status;
 
 	/* block read date and time registers */
@@ -912,7 +912,7 @@ static int menelaus_read_time(struct device *dev, struct rtc_time *t)
 
 	msg[1].addr = MENELAUS_I2C_ADDRESS;
 	msg[1].flags = I2C_M_RD;
-	msg[1].len = sizeof(regs);
+	msg[1].len = 7;
 	msg[1].buf = regs;
 
 	status = i2c_transfer(the_menelaus->client->adapter, msg, 2);
@@ -954,7 +954,7 @@ static int menelaus_set_time(struct device *dev, struct rtc_time *t)
 static int menelaus_read_alarm(struct device *dev, struct rtc_wkalrm *w)
 {
 	struct i2c_msg	msg[2];
-	char		regs[6];
+	char		regs[7];
 	int		status;
 
 	/* block read alarm registers */
@@ -967,7 +967,7 @@ static int menelaus_read_alarm(struct device *dev, struct rtc_wkalrm *w)
 
 	msg[1].addr = MENELAUS_I2C_ADDRESS;
 	msg[1].flags = I2C_M_RD;
-	msg[1].len = sizeof(regs);
+	msg[1].len = 6;
 	msg[1].buf = regs;
 
 	status = i2c_transfer(the_menelaus->client->adapter, msg, 2);
