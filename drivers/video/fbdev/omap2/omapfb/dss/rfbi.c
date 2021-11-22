@@ -1134,8 +1134,6 @@ static void rfbi_unbind(struct device *dev, struct device *master, void *data)
 	rfbi_uninit_output(pdev);
 
 	pm_runtime_disable(&pdev->dev);
-
-	return 0;
 }
 
 static const struct component_ops rfbi_component_ops = {
