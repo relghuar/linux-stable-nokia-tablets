@@ -886,7 +886,7 @@ fail:
 static int menelaus_read_time(struct device *dev, struct rtc_time *t)
 {
 	struct i2c_msg	msg[2];
-	char		regs[7];
+	char		regs[8];
 	int		status;
 
 	/* block read date and time registers */
@@ -941,7 +941,7 @@ static int menelaus_set_time(struct device *dev, struct rtc_time *t)
 static int menelaus_read_alarm(struct device *dev, struct rtc_wkalrm *w)
 {
 	struct i2c_msg	msg[2];
-	char		regs[6];
+	char		regs[8];
 	int		status;
 
 	/* block read alarm registers */
