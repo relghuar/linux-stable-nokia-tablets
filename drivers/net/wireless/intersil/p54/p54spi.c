@@ -581,22 +581,43 @@ static void p54spi_op_stop(struct ieee80211_hw *dev)
 	cancel_work_sync(&priv->work);
 }
 
-static int p54spi_probe(struct spi_device *spi)
+static int p54spi_init_common(struct p54s_priv *priv)
 {
-	struct p54s_priv *priv = NULL;
-	struct ieee80211_hw *hw;
+	struct spi_device *spi = priv->spi;
 	int ret = -EINVAL;
 
-	hw = p54_init_common(sizeof(*priv));
-	if (!hw) {
-		dev_err(&spi->dev, "could not alloc ieee80211_hw");
-		return -ENOMEM;
+	INIT_WORK(&priv->work, p54spi_work);
+	init_completion(&priv->fw_comp);
+	INIT_LIST_HEAD(&priv->tx_pending);
+	mutex_init(&priv->mutex);
+	spin_lock_init(&priv->tx_lock);
+	SET_IEEE80211_DEV(priv->hw, &spi->dev);
+	priv->common.open = p54spi_op_start;
+	priv->common.stop = p54spi_op_stop;
+	priv->common.tx = p54spi_op_tx;
+
+	ret = p54spi_request_firmware(priv->hw);
+	if (ret < 0) {
+		dev_err(&priv->spi->dev, "%s: firmware request failed: %d", __func__, ret);
+		return ret;
 	}
 
-	priv = hw->priv;
-	priv->hw = hw;
-	spi_set_drvdata(spi, priv);
-	priv->spi = spi;
+	ret = p54spi_request_eeprom(priv->hw);
+	if (ret) {
+		dev_err(&priv->spi->dev, "%s: eeprom request failed: %d", __func__, ret);
+		return ret;
+	}
+
+	ret = p54_register_common(priv->hw, &priv->spi->dev);
+	if (ret) {
+		dev_err(&priv->spi->dev, "%s: common register failed: %d", __func__, ret);
+	}
+	return ret;
+}
+
+static int p54spi_probe_platform(struct spi_device *spi, struct p54s_priv *priv)
+{
+	int ret = -EINVAL;
 
 	spi->bits_per_word = 16;
 	spi->max_speed_hz = 24000000;
@@ -634,26 +655,8 @@ static int p54spi_probe(struct spi_device *spi)
 
 	disable_irq(gpio_to_irq(p54spi_gpio_irq));
 
-	INIT_WORK(&priv->work, p54spi_work);
-	init_completion(&priv->fw_comp);
-	INIT_LIST_HEAD(&priv->tx_pending);
-	mutex_init(&priv->mutex);
-	spin_lock_init(&priv->tx_lock);
-	SET_IEEE80211_DEV(hw, &spi->dev);
-	priv->common.open = p54spi_op_start;
-	priv->common.stop = p54spi_op_stop;
-	priv->common.tx = p54spi_op_tx;
-
-	ret = p54spi_request_firmware(hw);
+	ret = p54spi_init_common(priv);
 	if (ret < 0)
-		goto err_free_common;
-
-	ret = p54spi_request_eeprom(hw);
-	if (ret)
-		goto err_free_common;
-
-	ret = p54_register_common(hw, &priv->spi->dev);
-	if (ret)
 		goto err_free_common;
 
 	return 0;
@@ -665,7 +668,45 @@ err_free_gpio_irq:
 err_free_gpio_power:
 	gpio_free(p54spi_gpio_power);
 err_free:
-	p54_free_common(priv->hw);
+	return ret;
+}
+
+static int p54spi_probe_of(struct spi_device *spi, struct p54s_priv *priv)
+{
+	int ret = -EINVAL;
+
+	// FIXME: temporarily use platform probe with GPIO module params
+	ret = p54spi_probe_platform(spi, priv);
+
+	return ret;
+}
+
+static int p54spi_probe(struct spi_device *spi)
+{
+	struct p54s_priv *priv = NULL;
+	struct ieee80211_hw *hw;
+	int ret = -EINVAL;
+
+	hw = p54_init_common(sizeof(*priv));
+	if (!hw) {
+		dev_err(&spi->dev, "could not alloc ieee80211_hw");
+		return -ENOMEM;
+	}
+
+	priv = hw->priv;
+	priv->hw = hw;
+	spi_set_drvdata(spi, priv);
+	priv->spi = spi;
+
+	if (spi->dev.of_node) {
+		ret = p54spi_probe_of(spi, priv);
+	} else {
+		ret = p54spi_probe_platform(spi, priv);
+	}
+
+	if (ret)
+		p54_free_common(priv->hw);
+
 	return ret;
 }
 
@@ -689,9 +730,16 @@ static int p54spi_remove(struct spi_device *spi)
 }
 
 
+static const struct of_device_id p54spi_of_match[] = {
+        { .compatible = "intersil,p54spi", },
+        {},
+};
+MODULE_DEVICE_TABLE(of, p54spi_of_match);
+
 static struct spi_driver p54spi_driver = {
 	.driver = {
 		.name		= "p54spi",
+		.of_match_table = p54spi_of_match,
 	},
 
 	.probe		= p54spi_probe,
