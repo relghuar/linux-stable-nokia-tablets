@@ -312,7 +312,7 @@
 			#size-cells = <1>;
 			ranges;
 
-			dispc@48050400 {
+			dispc: dispc@48050400 {
 				compatible = "ti,omap2-dispc";
 				reg = <0x48050400 0x400>;
 				interrupts = <25>;

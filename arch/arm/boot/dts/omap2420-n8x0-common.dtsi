@@ -26,6 +26,12 @@
 				interrupts = <12 IRQ_TYPE_EDGE_RISING>;
 				reg = <0x1>;
 			};
+			tahvo: tahvo@2 {
+				compatible = "nokia,tahvo";
+				interrupt-parent = <&gpio4>;
+				interrupts = <15 IRQ_TYPE_EDGE_RISING>;
+				reg = <0x2>;
+			};
 		};
 	};
 };
