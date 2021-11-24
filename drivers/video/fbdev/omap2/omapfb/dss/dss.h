@@ -441,6 +441,24 @@ void hdmi4_uninit_platform_driver(void);
 int hdmi5_init_platform_driver(void) __init;
 void hdmi5_uninit_platform_driver(void);
 
+/* RFBI */
+int rfbi_init_platform_driver(void) __init;
+void rfbi_uninit_platform_driver(void);
+
+#ifdef CONFIG_FB_OMAP2_DSS_RFBI
+int rfbi_init_port(struct platform_device *pdev, struct device_node *port);
+void rfbi_uninit_port(struct device_node *port);
+#else
+static inline int rfbi_init_port(struct platform_device *pdev,
+		struct device_node *port)
+{
+	return 0;
+}
+static inline void rfbi_uninit_port(struct device_node *port)
+{
+}
+#endif
+
 
 #ifdef CONFIG_FB_OMAP2_DSS_COLLECT_IRQ_STATS
 static inline void dss_collect_irq_stats(u32 irqstatus, unsigned *irq_arr)

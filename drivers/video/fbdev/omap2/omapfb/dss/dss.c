@@ -951,6 +951,9 @@ static int dss_init_ports(struct platform_device *pdev)
 		case OMAP_DISPLAY_TYPE_SDI:
 			ret = sdi_init_port(pdev, port);
 			break;
+		case OMAP_DISPLAY_TYPE_DBI:
+			ret = rfbi_init_port(pdev, port);
+			break;
 		default:
 			break;
 		}
@@ -1203,14 +1206,8 @@ static int dss_add_child_component(struct device *dev, void *data)
 {
 	struct component_match **match = data;
 
-	/*
-	 * HACK
-	 * We don't have a working driver for rfbi, so skip it here always.
-	 * Otherwise dss will never get probed successfully, as it will wait
-	 * for rfbi to get probed.
-	 */
 	if (strstr(dev_name(dev), "rfbi"))
-		return 0;
+		DSSINFO("%s: FIXME: accepting 'rfbi' device %s\n", __func__, dev_name(dev));
 
 	component_match_add(dev->parent, match, dss_component_compare, dev);
 
