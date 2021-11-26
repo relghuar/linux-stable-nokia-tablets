@@ -292,6 +292,34 @@ static int retu_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 		return ret;
 	}
 
+	if (rdev->dev->of_node) {
+		int ncells;
+		struct device_node *np = dev_of_node(rdev->dev);
+		struct device_node *child;
+		struct mfd_cell *cells;
+
+		ncells = of_get_available_child_count(np);
+		cells = devm_kzalloc(rdev->dev, ncells*sizeof(struct mfd_cell), GFP_KERNEL);
+
+		ncells = 0;
+		for_each_available_child_of_node(np, child) {
+			ret = of_property_read_string(child, "compatible", &cells[ncells].of_compatible);
+			if (!ret) {
+				cells[ncells].name = child->name;
+				dev_dbg(rdev->dev, "%s:   found cell '%s' compat='%s'\n",
+						__func__, child->name, cells[ncells].of_compatible);
+				ncells++;
+			}
+		}
+
+		dev_dbg(rdev->dev, "%s: adding %d cells\n", __func__, ncells);
+		if (ncells > 0) {
+			ret = mfd_add_devices(rdev->dev, -1, cells, ncells,
+					     NULL, regmap_irq_chip_get_base(rdev->irq_data),
+					     NULL);
+		}
+	}
+
 	if (i2c->addr == 1 && !pm_power_off) {
 		retu_pm_power_off = rdev;
 		pm_power_off	  = retu_power_off;
