@@ -22,6 +22,9 @@ struct retu_dev* retu_get_dev_tahvo(void);
 #define RETU_REG_CC1		0x0d		/* Common control register 1 */
 #define RETU_REG_STATUS		0x16		/* Status register */
 
+#define TAHVO_REG_LEDPWM	0x05
+#define TAHVO_REG_VCORE		0x07
+
 /* Interrupt sources */
 #define TAHVO_INT_VBUS		0		/* VBUS state */
 
