@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm 5.15.2 Kernel Configuration
+# Linux/arm 5.15.3 Kernel Configuration
 #
 CONFIG_CC_VERSION_TEXT="arm-linux-gnueabihf-gcc (Linaro GCC 7.5-2019.12) 7.5.0"
 CONFIG_CC_IS_GCC=y
@@ -3196,6 +3196,7 @@ CONFIG_LEDS_LP5521=y
 # CONFIG_LEDS_USER is not set
 # CONFIG_LEDS_SPI_BYTE is not set
 # CONFIG_LEDS_TI_LMU_COMMON is not set
+CONFIG_LEDS_TAHVO=y
 
 #
 # Flash and Torch LED drivers

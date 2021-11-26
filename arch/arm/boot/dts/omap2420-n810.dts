@@ -22,6 +22,20 @@
 		regulator-min-microvolt = <2800000>;
 		regulator-max-microvolt = <2800000>;
 	};
+
+	backlight: backlight {
+		compatible = "led-backlight";
+
+		leds = <&tahvo_ledpwm>;
+		brightness-levels = <0 8 16 24 32 40 48 56 64 72 80 88 96 104 112 120 127>;
+		default-brightness-level = <16>;
+	};
+};
+
+&tahvo {
+	tahvo_ledpwm: tahvo_ledpwm {
+		compatible = "nokia,tahvo,ledpwm";
+	};
 };
 
 &omap2420_pmx {
