@@ -672,9 +672,9 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 			irqstat_reg = mcspi->base + OMAP2_MCSPI_IRQSTATUS;
 
 			// FIXME: this should wait standard 1s and there should be no timeout!
-			// however, with 50ms ignoring timeout message the wifi works fine.
+			// however, by ignoring a very short timeout the wifi works at ~50k/s
 			if (mcspi_wait_for_reg_bit_ms(irqstat_reg,
-						OMAP2_MCSPI_IRQSTATUS_EOW, 50) < 0)
+						OMAP2_MCSPI_IRQSTATUS_EOW, 10) < 0)
 				dev_dbg(&spi->dev, "EOW timed out\n");
 
 			mcspi_write_reg(mcspi->master, OMAP2_MCSPI_IRQSTATUS,
@@ -686,9 +686,9 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 			chstat_reg = cs->base + OMAP2_MCSPI_CHSTAT0;
 			if (mcspi->fifo_depth > 0) {
 				// FIXME: this should wait standard 1s and there should be no timeout!
-				// however, with 50ms ignoring timeout message the wifi works fine.
+				// however, by ignoring a very short timeout the wifi works at ~50k/s
 				wait_res = mcspi_wait_for_reg_bit_ms(chstat_reg,
-						OMAP2_MCSPI_CHSTAT_TXFFE, 50);
+						OMAP2_MCSPI_CHSTAT_TXFFE, 10);
 				if (wait_res < 0)
 					dev_dbg(&spi->dev, "TXFFE timed out\n");
 			} else {
