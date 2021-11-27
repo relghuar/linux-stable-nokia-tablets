@@ -543,6 +543,15 @@ config RTC_DRV_TWL92330
 	  platforms. The support is integrated with the rest of
 	  the Menelaus driver; it's not separate module.
 
+config RTC_DRV_RETU
+	tristate "Support for Retu RTC"
+	depends on MFD_RETU
+	help
+	  Say Y here if you want support for the device that alleges to be
+	  an RTC in Retu. This will expose a sysfs interface for it.
+	  Nokia N810 has a secondary battery backup connected to Vilma
+	  chip that requires this driver.
+
 config RTC_DRV_TWL4030
 	tristate "TI TWL4030/TWL5030/TWL6030/TPS659x0"
 	depends on TWL4030_CORE
