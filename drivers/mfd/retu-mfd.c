@@ -28,16 +28,6 @@
 #include <linux/interrupt.h>
 #include <linux/moduleparam.h>
 
-/* Registers */
-#define RETU_REG_ASICR		0x00		/* ASIC ID and revision */
-#define RETU_REG_ASICR_VILMA	(1 << 7)	/* Bit indicating Vilma */
-#define RETU_REG_IDR		0x01		/* Interrupt ID */
-#define RETU_REG_IMR		0x02		/* Interrupt mask (Retu) */
-#define TAHVO_REG_IMR		0x03		/* Interrupt mask (Tahvo) */
-
-/* Interrupt sources */
-#define RETU_INT_PWR		0		/* Power button */
-
 struct retu_dev {
 	struct regmap			*regmap;
 	struct device			*dev;

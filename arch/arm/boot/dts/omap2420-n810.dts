@@ -32,6 +32,12 @@
 	};
 };
 
+&retu {
+	retu_rtc: retu_rtc {
+		compatible = "nokia,retu,rtc";
+	};
+};
+
 &tahvo {
 	tahvo_ledpwm: tahvo_ledpwm {
 		compatible = "nokia,tahvo,ledpwm";
