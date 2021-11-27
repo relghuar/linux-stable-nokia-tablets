@@ -7,7 +7,7 @@
 #include <linux/rtc.h>
 #include <linux/io.h>
 #include <linux/mfd/retu.h>
-#include <linux/delay.h>
+#include <linux/timekeeping.h>
 
 struct retu_rtc {
 	struct rtc_device *rtc_dev;
@@ -31,8 +31,6 @@ static void retu_rtc_do_reset(struct retu_rtc *rtc)
 
 	mutex_lock(&rtc->mutex);
 
-	dev_info(&rtc->rtc_dev->dev, "%s\n", __func__);
-
 	/* If the calibration register is zero, we've probably lost power */
 	/* If not, there should be no reason to reset */
 	ccr1 = retu_read(rtc->rdev, RETU_REG_RTCCALR);
@@ -41,6 +39,8 @@ static void retu_rtc_do_reset(struct retu_rtc *rtc)
 		mutex_unlock(&rtc->mutex);
 		return;
 	}
+
+	dev_info(&rtc->rtc_dev->dev, "%s: resetting rtc\n", __func__);
 
 	ccr1 = retu_read(rtc->rdev, RETU_REG_CC1);
 	/* RTC in reset */
@@ -63,28 +63,53 @@ static int retu_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	struct retu_rtc *rtc = dev_get_drvdata(dev);
 	u16 dsr;
 	u16 hmr;
+	u16 dsr2;
 
 	dev_info(dev, "%s\n", __func__);
+
+	mutex_lock(&rtc->mutex);
+
+	/*
+	 * This read code has been taken over from original 2.6.21 vendor kernel.
+	 * It looks awful, but the comments suggest RTC in the chip is awful itself.
+	 */
+
+	do {
+		u16 dummy;
+
+		/*
+		 * Not being in_interrupt() for a retu rtc IRQ, we need to
+		 * read twice for consistency..
+		 */
+		dummy   = retu_read(rtc->rdev, RETU_REG_RTCDSR);
+		dsr     = retu_read(rtc->rdev, RETU_REG_RTCDSR);
+
+		dummy   = retu_read(rtc->rdev, RETU_REG_RTCHMR);
+		hmr     = retu_read(rtc->rdev, RETU_REG_RTCHMR);
+
+		dummy   = retu_read(rtc->rdev, RETU_REG_RTCDSR);
+		dsr2    = retu_read(rtc->rdev, RETU_REG_RTCDSR);
+	} while ((dsr != dsr2));
 
 	/*
 	 * DSR holds days and seconds
 	 * HMR hols hours and minutes
 	 *
 	 * both are 16 bit registers with 8-bit for each field.
+	 * Conversion code was also taken from vendor kernel, including bitmasks.
 	 */
 
-	mutex_lock(&rtc->mutex);
+	rtc_time64_to_tm(ktime_get_real_seconds(), tm);
+	tm->tm_yday     = 0;
+	tm->tm_wday     = 0;
+	tm->tm_sec      = dsr & 0x3f;
+	tm->tm_min      = hmr & 0x3f;
+	tm->tm_hour     = (hmr >> 8) & 0x1f;
+	tm->tm_mday     = (dsr >> 8) & 0xff;
 
-	dsr     = retu_read(rtc->rdev, RETU_REG_RTCDSR);
-	hmr     = retu_read(rtc->rdev, RETU_REG_RTCHMR);
-
-	tm->tm_sec      = dsr & 0x7f;
-	tm->tm_min      = hmr & 0x7f;
-	tm->tm_hour     = (hmr >> 8) & 0x7f;
-	tm->tm_mday     = (dsr >> 8) & 0x7f;
-
-	dev_info(dev, "%s: dsr=%04x hmr=%04x %d.%02d:%02d:%02d\n", __func__,
-			dsr, hmr, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+	dev_info(dev, "%s: dsr=%04x hmr=%04x %d-%02d-%02d %02d:%02d:%02d\n",
+			__func__, dsr, hmr, tm->tm_year, tm->tm_mon,
+			tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
 
 	mutex_unlock(&rtc->mutex);
 
@@ -94,7 +119,7 @@ static int retu_rtc_read_time(struct device *dev, struct rtc_time *tm)
 static int retu_rtc_set_time(struct device *dev, struct rtc_time *tm)
 {
 	struct retu_rtc *rtc = dev_get_drvdata(dev);
-	u16 dsr;
+	u16 dsr, dsrr;
 	u16 hmr;
 
 	dsr = ((tm->tm_mday & 0xff) << 8) | (tm->tm_sec & 0xff);
@@ -102,10 +127,19 @@ static int retu_rtc_set_time(struct device *dev, struct rtc_time *tm)
 
 	mutex_lock(&rtc->mutex);
 
-	dev_info(dev, "%s: dsr=%04x hmr=%04x %d.%02d:%02d:%02d\n", __func__,
-			dsr, hmr, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+	/*
+	 * Comment from original vendor kernel:
+	 * Writing anything to the day counter forces it to 0
+	 * The seconds counter would be cleared by resetting the minutes counter.
+	 * Reset day counter, but keep Temperature Shutdown state
+	 */
+	dsrr = retu_read(rtc->rdev, RETU_REG_RTCDSR);
+	dsrr &= 1 << 6;
 
-	retu_write(rtc->rdev, RETU_REG_RTCDSR, dsr);
+	dev_info(dev, "%s: dsr=%04x dsrr=%04x hmr=%04x %d.%02d:%02d:%02d\n", __func__,
+			dsr, dsrr, hmr, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+
+	retu_write(rtc->rdev, RETU_REG_RTCDSR, dsrr);
 	retu_write(rtc->rdev, RETU_REG_RTCHMR, hmr);
 
 	mutex_unlock(&rtc->mutex);
