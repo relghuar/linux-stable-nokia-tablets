@@ -29,14 +29,18 @@ static void retu_rtc_do_reset(struct retu_rtc *rtc)
 {
 	u16 ccr1;
 
+	mutex_lock(&rtc->mutex);
+
 	dev_info(&rtc->rtc_dev->dev, "%s\n", __func__);
 
 	/* If the calibration register is zero, we've probably lost power */
 	/* If not, there should be no reason to reset */
 	ccr1 = retu_read(rtc->rdev, RETU_REG_RTCCALR);
 	dev_info(&rtc->rtc_dev->dev, "%s: rtccal=%04x\n", __func__, ccr1);
-	if (ccr1 & 0x00ff)
+	if (ccr1 & 0x00ff) {
+		mutex_unlock(&rtc->mutex);
 		return;
+	}
 
 	ccr1 = retu_read(rtc->rdev, RETU_REG_CC1);
 	/* RTC in reset */
@@ -50,6 +54,8 @@ static void retu_rtc_do_reset(struct retu_rtc *rtc)
 	retu_write(rtc->rdev, RETU_REG_RTCCALR, 0x00c0);
 
 	rtc->alarm_expired = 0;
+
+	mutex_unlock(&rtc->mutex);
 }
 
 static int retu_rtc_read_time(struct device *dev, struct rtc_time *tm)
@@ -61,8 +67,8 @@ static int retu_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	dev_info(dev, "%s\n", __func__);
 
 	/*
-	 * DSR holds days and hours
-	 * HMR hols minutes and seconds
+	 * DSR holds days and seconds
+	 * HMR hols hours and minutes
 	 *
 	 * both are 16 bit registers with 8-bit for each field.
 	 */
@@ -72,10 +78,10 @@ static int retu_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	dsr     = retu_read(rtc->rdev, RETU_REG_RTCDSR);
 	hmr     = retu_read(rtc->rdev, RETU_REG_RTCHMR);
 
-	tm->tm_sec      = hmr & 0xff;
-	tm->tm_min      = hmr >> 8;
-	tm->tm_hour     = dsr & 0xff;
-	tm->tm_mday     = dsr >> 8;
+	tm->tm_sec      = dsr & 0x7f;
+	tm->tm_min      = hmr & 0x7f;
+	tm->tm_hour     = (hmr >> 8) & 0x7f;
+	tm->tm_mday     = (dsr >> 8) & 0x7f;
 
 	dev_info(dev, "%s: dsr=%04x hmr=%04x %d.%02d:%02d:%02d\n", __func__,
 			dsr, hmr, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
@@ -91,8 +97,8 @@ static int retu_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	u16 dsr;
 	u16 hmr;
 
-	dsr = ((tm->tm_mday & 0xff) << 8) | (tm->tm_hour & 0xff);
-	hmr = ((tm->tm_min & 0xff) << 8) | (tm->tm_sec & 0xff);
+	dsr = ((tm->tm_mday & 0xff) << 8) | (tm->tm_sec & 0xff);
+	hmr = ((tm->tm_hour & 0xff) << 8) | (tm->tm_min & 0xff);
 
 	mutex_lock(&rtc->mutex);
 

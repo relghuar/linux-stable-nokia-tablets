@@ -33,11 +33,8 @@ Code quality of most changes is awful; main goal for now is to get the hardware 
 
 - Backup battery (somewhere on-board probably?) seems to only be connected to Vilma chip, pin VBack, so no other RTC source can survive removal of main battery.
 - Menelaus RTC driver present in kernel is useless for Nokia N810 without some changes - according to schematics the 32KDETEN pin on the chip is pulled down, so menelaus_rtc_init() breaks off right at the first check. According to the same schematics, Menelaus chip does not seem to have any 32Khz input (there's only 32KOUT which is not connected anywhere). I didn't find any datasheet yet, so it's difficult to say if a pulled-down 32KDETEN makes RTC truly unusable ; or generally if it is of any use in N810.
-- Vilma/Retu RTC driver built based on [this old patch file](https://git.openwrt.org/?p=openwrt/openwrt.git;a=blob;f=target/linux/omap24xx/patches-3.3/250-cbus.patch;h=b152a00b5b986b780be8d64443032d7c25e0594a;hb=fa097e5ae5fddb82a077a0bb1676a512fa2d908e) works in theory, but practically is also useless, at least on my N810. Every read returns different values, even right after setting correct ones.
-  - This may be caused by a dead battery (old device which survived an actual flood, so....), though it's surprising the chip does not use main battery when it's plugged in (perhaps because it could only use it while the device is turned on?).
-    - Dead battery theory has a tiny hole though, as the original firmware reports no issues:
-      - [31.599518 0.014917] RTC operating normally
-      - [31.600308 0.000790] retutime -r reported "RTC operating normally"
-    - Another issue with dead battery theory might be value of RTCCAL register, which is consistently 0xc0 at probe time which seems to be OK??
-  - TODO: next time I have the device disassembled, try locating the battery and look for potential replacements? Eventually someone whose backup battery is in better condition could do independent tests?
+- Vilma/Retu RTC driver built based on [this old patch file](https://git.openwrt.org/?p=openwrt/openwrt.git;a=blob;f=target/linux/omap24xx/patches-3.3/250-cbus.patch;h=b152a00b5b986b780be8d64443032d7c25e0594a;hb=fa097e5ae5fddb82a077a0bb1676a512fa2d908e) seems to work at least partially.
+  - DSR/HMR register structure in read/set time functions had to be corrected based on real values and highest bit in all 4 values had to be masked out as it came high apparently at random, but now at least minutes and seconds behave correctly on reads (hours and days remain to be seen).
+  - Writing DSR/HMR registers seems to have no effect at all, no idea yet why (perhaps some other bit has to be set/cleared somewhere else??)
+  - TODO: next time I have the device disassembled, try locating the battery and check its status.
 
