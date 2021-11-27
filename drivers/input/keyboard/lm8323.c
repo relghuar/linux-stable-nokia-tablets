@@ -616,8 +616,8 @@ static ssize_t lm8323_set_disable(struct device *dev,
 }
 static DEVICE_ATTR(disable_kp, 0644, lm8323_show_disable, lm8323_set_disable);
 
-int lm8323_of_matrix_parse_keymap(struct device *dev, const char *propname,
-				  unsigned short *lm8323_keymap) {
+unsigned short *lm8323_of_matrix_parse_keymap(struct device *dev, const char *propname) {
+	unsigned short *lm8323_keymap;
 	int size;
 	int i;
 	int retval;
@@ -627,23 +627,28 @@ int lm8323_of_matrix_parse_keymap(struct device *dev, const char *propname,
 	if (size <= 0) {
 		dev_err(dev, "missing or malformed property %s: %d\n",
 			propname, size);
-		return size < 0 ? size : -EINVAL;
+		return ERR_PTR(size < 0 ? size : -EINVAL);
 	}
 
 	if (size > LM8323_KEYMAP_SIZE-1) {
 		dev_err(dev, "%s size overflow (%d vs max %u)\n",
 			propname, size, LM8323_KEYMAP_SIZE-1);
-		return -EINVAL;
+		return ERR_PTR(-EINVAL);
 	}
+
+	lm8323_keymap = devm_kzalloc(dev, LM8323_KEYMAP_SIZE, GFP_KERNEL);
+	if (!lm8323_keymap)
+		return ERR_PTR(-ENOMEM);
 
 	keys = kmalloc_array(size, sizeof(u32), GFP_KERNEL);
 	if (!keys)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	retval = device_property_read_u32_array(dev, propname, keys, size);
 	if (retval) {
 		dev_err(dev, "failed to read %s property: %d\n",
 			propname, retval);
+		lm8323_keymap = ERR_PTR(retval);
 		goto out;
 	}
 
@@ -656,11 +661,9 @@ int lm8323_of_matrix_parse_keymap(struct device *dev, const char *propname,
 		lm8323_keymap[ ((kr<<4) | kc) + 1 ] = scan;
 	}
 
-	retval = 0;
-
 out:
 	kfree(keys);
-	return retval;
+	return lm8323_keymap;
 }
 
 struct lm8323_platform_data *lm8323_of_populate_pdata(struct device *dev)
@@ -672,10 +675,6 @@ struct lm8323_platform_data *lm8323_of_populate_pdata(struct device *dev)
 	if (!pdata)
 		return ERR_PTR(-ENOMEM);
 
-	pdata->keymap = devm_kzalloc(dev, LM8323_KEYMAP_SIZE, GFP_KERNEL);
-	if (!pdata->keymap)
-		return ERR_PTR(-ENOMEM);
-
 	device_property_read_u32(dev, "keypad,num-rows", &pdata->size_x);
 	device_property_read_u32(dev, "keypad,num-columns", &pdata->size_y);
 
@@ -684,7 +683,7 @@ struct lm8323_platform_data *lm8323_of_populate_pdata(struct device *dev)
 		return ERR_PTR(-EINVAL);
 	}
 
-	error = lm8323_of_matrix_parse_keymap(dev, "linux,keymap", pdata->keymap);
+	pdata->keymap = lm8323_of_matrix_parse_keymap(dev, "linux,keymap");
 	if (error) {
 		dev_err(dev, "Failed to build Keymap (%d)\n", error);
 		return ERR_PTR(error);
