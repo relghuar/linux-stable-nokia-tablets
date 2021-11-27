@@ -1085,7 +1085,7 @@ static inline void menelaus_rtc_init(struct menelaus_chip *m)
 
 	/* assume 32KDETEN pin is pulled high */
 	if (!(menelaus_read_reg(MENELAUS_OSC_CTRL) & 0x80)) {
-		dev_dbg(&m->client->dev, "no 32k oscillator\n");
+		dev_warn(&m->client->dev, "no 32k oscillator\n");
 		return;
 	}
 
