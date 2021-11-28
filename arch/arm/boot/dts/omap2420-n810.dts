@@ -58,6 +58,13 @@
 	tahvo_ledpwm: tahvo_ledpwm {
 		compatible = "nokia,tahvo,ledpwm";
 	};
+	tahvo_vcore: tahvo_vcore {
+		compatible = "nokia,tahvo,vcore-regulator";
+		regulator-name = "tornado_vcore";
+		regulator-min-microvolt = <1005000>;
+		regulator-max-microvolt = <1475000>;
+		regulator-always-on;
+	};
 };
 
 &omap2420_pmx {
@@ -322,6 +329,10 @@
 		label = "lcd";
 		reset-gpios = <&gpio1 30 GPIO_ACTIVE_HIGH>; /* 30 */
 		powerdown-gpio = <&gpio1 15 GPIO_ACTIVE_HIGH>; /* 15 */
+
+		vtornado-supply = <&tahvo_vcore>;
+		vtornado-on-microvolt = <1475000>;
+		vtornado-off-microvolt = <1005000>;
 
 		backlight = <&backlight>;
 
