@@ -44,6 +44,7 @@ static int tahvo_led_probe(struct platform_device *pdev)
 	if (pdev->dev.of_node && pdev->dev.of_node->name) {
 		led->cdev.name = pdev->dev.of_node->name;
 	} else {
+		dev_warn(&pdev->dev, "No OF node found, using default name!\n");
 		led->cdev.name = "tahvo:led";
 	}
 	led->rdev = rdev;

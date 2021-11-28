@@ -40,32 +40,14 @@
 #include <video/omap-panel-data.h>
 
 #define MIPID_CMD_READ_DISP_ID		0x04
-#define MIPID_CMD_READ_RED		0x06
-#define MIPID_CMD_READ_GREEN		0x07
-#define MIPID_CMD_READ_BLUE		0x08
 #define MIPID_CMD_READ_DISP_STATUS	0x09
-#define MIPID_CMD_RDDSDR		0x0F
 #define MIPID_CMD_SLEEP_IN		0x10
 #define MIPID_CMD_SLEEP_OUT		0x11
 #define MIPID_CMD_DISP_OFF		0x28
 #define MIPID_CMD_DISP_ON		0x29
-#define MIPID_CMD_WRITE_DISP_BRIGHTNESS	0x51
-#define MIPID_CMD_READ_DISP_BRIGHTNESS	0x52
-#define MIPID_CMD_WRITE_CTRL_DISP	0x53
-
-#define CTRL_DISP_BRIGHTNESS_CTRL_ON	(1 << 5)
-#define CTRL_DISP_AMBIENT_LIGHT_CTRL_ON	(1 << 4)
-#define CTRL_DISP_BACKLIGHT_ON		(1 << 2)
-#define CTRL_DISP_AUTO_BRIGHTNESS_ON	(1 << 1)
-
-#define MIPID_CMD_READ_CTRL_DISP	0x54
-#define MIPID_CMD_WRITE_CABC		0x55
-#define MIPID_CMD_READ_CABC		0x56
 
 #define MIPID_VER_LPH8923		3
 #define MIPID_VER_LS041Y3		4
-#define MIPID_VER_L4F00311		8
-#define MIPID_VER_ACX565AKM		9
 
 
 #define BLIZZARD_REV_CODE                      0x00
@@ -460,10 +442,6 @@ static int panel_detect(struct panel_drv_data *ddata)
 		ddata->display_id[2]);
 
 	switch (ddata->display_id[0]) {
-	case 0x29:
-		ddata->model = MIPID_VER_L4F00311;
-		ddata->name = "l4f00311";
-		break;
 	case 0x45:
 		ddata->model = MIPID_VER_LPH8923;
 		ddata->name = "lph8923";
@@ -561,10 +539,35 @@ static void framebuffer_init(struct panel_drv_data *ddata)
         l |= 0x1;
         blizzard_write_reg(dssdev, BLIZZARD_PLL_MODE, l);
 
-        while (!(blizzard_read_reg(dssdev, BLIZZARD_PLL_DIV) & (1 << 7)))
+	l = 1000;
+        while (!(blizzard_read_reg(dssdev, BLIZZARD_PLL_DIV) & (1 << 7))
+			&& (l-- > 0))
                 msleep(1);
+	if (l < 900)
+		dev_warn(dssdev->dev, "%s: pll loops left %d\n", __func__, l);
 
 	blizzard_write_reg(dssdev, BLIZZARD_DISPLAY_MODE, 0x01);
+}
+
+// TODO: vendor kernel does a lot more to shut the fb chip down, for example
+// saving regs and stopping sdram. This would require reverse operations in
+// our fb init as well.
+// Better solution might be putting it to reset mode (see reset-gpio comment
+// in power_down), we'd have to check what the actual consumption is.
+static void framebuffer_sleep(struct panel_drv_data *ddata)
+{
+	struct omap_dss_device *dssdev = ddata->in;
+	u32 l;
+
+        dssdev->ops.rfbi->set_data_lines(dssdev, 8);
+        dssdev->ops.rfbi->configure(dssdev);
+
+        l = blizzard_read_reg(dssdev, BLIZZARD_POWER_SAVE);
+        /* Standby, Sleep */
+        l |= 0x03;
+        blizzard_write_reg(dssdev, BLIZZARD_POWER_SAVE, l);
+
+	msleep(100);
 }
 
 static void blizzard_ctrl_setup_update(struct omap_dss_device *dssdev,
@@ -629,89 +632,6 @@ static void tahvo_set_clear_reg_bits(unsigned reg, u16 set, u16 clear) {
         spin_unlock_irqrestore(&tahvo_lock, flags);
 }
 
-/*----------------------Backlight Control-------------------------*/
-
-static void n8x0_panel_set_brightness(struct panel_drv_data *ddata, int level)
-{
-	struct retu_dev *tahvo = retu_get_dev_tahvo();
-
-	if (tahvo != NULL) {
-		retu_write(tahvo, 0x05, (level & 0x7f));
-	}
-}
-
-static int n8x0_panel_get_actual_brightness(struct panel_drv_data *ddata)
-{
-	struct retu_dev *tahvo = retu_get_dev_tahvo();
-
-	if (tahvo != NULL)
-		return retu_read(tahvo, 0x05);
-	else
-		return 0;
-}
-
-
-static int n8x0_panel_bl_update_status(struct backlight_device *dev)
-{
-	struct panel_drv_data *ddata = dev_get_drvdata(&dev->dev);
-	int level;
-
-	dev_info(&ddata->spi->dev, "%s\n", __func__);
-
-	if (dev->props.fb_blank == FB_BLANK_UNBLANK &&
-			dev->props.power == FB_BLANK_UNBLANK)
-		level = dev->props.brightness;
-	else
-		level = 0;
-
-	n8x0_panel_set_brightness(ddata, level);
-
-	return 0;
-}
-
-static int n8x0_panel_bl_get_intensity(struct backlight_device *dev)
-{
-	struct panel_drv_data *ddata = dev_get_drvdata(&dev->dev);
-
-	dev_info(&dev->dev, "%s\n", __func__);
-
-	if (dev->props.fb_blank == FB_BLANK_UNBLANK &&
-			dev->props.power == FB_BLANK_UNBLANK) {
-		return n8x0_panel_get_actual_brightness(ddata);
-	}
-
-	return 0;
-}
-
-static int n8x0_panel_bl_update_status_locked(struct backlight_device *dev)
-{
-	struct panel_drv_data *ddata = dev_get_drvdata(&dev->dev);
-	int r;
-
-	mutex_lock(&ddata->mutex);
-	r = n8x0_panel_bl_update_status(dev);
-	mutex_unlock(&ddata->mutex);
-
-	return r;
-}
-
-static int n8x0_panel_bl_get_intensity_locked(struct backlight_device *dev)
-{
-	struct panel_drv_data *ddata = dev_get_drvdata(&dev->dev);
-	int r;
-
-	mutex_lock(&ddata->mutex);
-	r = n8x0_panel_bl_get_intensity(dev);
-	mutex_unlock(&ddata->mutex);
-
-	return r;
-}
-
-static const struct backlight_ops n8x0_panel_bl_ops = {
-	.get_brightness = n8x0_panel_bl_get_intensity_locked,
-	.update_status  = n8x0_panel_bl_update_status_locked,
-};
-
 
 static int n8x0_panel_connect(struct omap_dss_device *dssdev)
 {
@@ -719,7 +639,7 @@ static int n8x0_panel_connect(struct omap_dss_device *dssdev)
 	struct omap_dss_device *in = ddata->in;
 	int r;
 
-	dev_info(dssdev->dev, "%s\n", __func__);
+	dev_dbg(dssdev->dev, "%s\n", __func__);
 
 	if (omapdss_device_is_connected(dssdev))
 		return 0;
@@ -736,7 +656,7 @@ static void n8x0_panel_disconnect(struct omap_dss_device *dssdev)
 	struct panel_drv_data *ddata = to_panel_data(dssdev);
 	struct omap_dss_device *in = ddata->in;
 
-	dev_info(dssdev->dev, "%s\n", __func__);
+	dev_dbg(dssdev->dev, "%s\n", __func__);
 
 	if (!omapdss_device_is_connected(dssdev))
 		return;
@@ -750,7 +670,7 @@ static int n8x0_panel_power_on(struct omap_dss_device *dssdev)
 	struct omap_dss_device *in = ddata->in;
 	int r;
 
-	dev_info(&ddata->spi->dev, "%s ps=%d dl=%d en=%d\n", __func__,
+	dev_dbg(&ddata->spi->dev, "%s ps=%d dl=%d en=%d\n", __func__,
 			dssdev->ctrl.pixel_size, dssdev->phy.rfbi.data_lines,
 			ddata->enabled);
 
@@ -763,8 +683,6 @@ static int n8x0_panel_power_on(struct omap_dss_device *dssdev)
 	if (gpio_is_valid(ddata->reset_gpio))
 		gpio_set_value(ddata->reset_gpio, 1);
 	msleep(10);
-
-	dev_info(&ddata->spi->dev, "%s: tim=%px\n", __func__, &ddata->videomode);
 
 	in->ops.rfbi->set_timings(in, &ddata->videomode);
 	in->ops.rfbi->set_rfbi_timings(in, &n8x0_panel_rfbi_timings);
@@ -800,13 +718,22 @@ static int n8x0_panel_power_on(struct omap_dss_device *dssdev)
 	r = framebuffer_detect(ddata);
 	if (r) {
 		dev_err(&ddata->spi->dev, "Failed to detect framebuffer!\n");
-		in->ops.rfbi->disable(in);
-		return r;
+		goto err_rfbi;
 	}
 
 	framebuffer_init(ddata);
 
-	return n8x0_panel_bl_update_status(ddata->bl_dev);
+	r = backlight_enable(ddata->bl_dev);
+	if (r) {
+		dev_err(&ddata->spi->dev, "Failed to enable backlight!\n");
+		goto err_rfbi;
+	}
+
+	return 0;
+
+err_rfbi:
+	in->ops.rfbi->disable(in);
+	return r;
 }
 
 static void n8x0_panel_power_off(struct omap_dss_device *dssdev)
@@ -814,33 +741,38 @@ static void n8x0_panel_power_off(struct omap_dss_device *dssdev)
 	struct panel_drv_data *ddata = to_panel_data(dssdev);
 	struct omap_dss_device *in = ddata->in;
 
-	dev_info(dssdev->dev, "%s\n", __func__);
+	dev_dbg(dssdev->dev, "%s\n", __func__);
 
 	if (!ddata->enabled)
 		return;
+
+	backlight_disable(ddata->bl_dev);
+
+	framebuffer_sleep(ddata);
 
 	set_display_state(ddata, 0);
 	set_sleep_mode(ddata, 1);
 	ddata->enabled = 0;
 	msleep(10);
 
-	if (gpio_is_valid(ddata->reset_gpio))
-		gpio_set_value(ddata->reset_gpio, 0);
+	in->ops.rfbi->disable(in);
+
+	// FIXME: we cannot pull down reset apparently without additional
+	// initialization in power_on. Even vendor kernel does not do that
+	// (actually it does not seem to do anything with this gpio).
+//	if (gpio_is_valid(ddata->reset_gpio))
+//		gpio_set_value(ddata->reset_gpio, 0);
 	if (gpio_is_valid(ddata->powerdown_gpio))
 		gpio_set_value(ddata->powerdown_gpio, 0);
 
-	tahvo_set_clear_reg_bits(0x07, 0xf, 0);
 	clk_disable(ddata->osc_ck);
-
-	in->ops.rfbi->disable(in);
+	tahvo_set_clear_reg_bits(0x07, 0xf, 0);
 }
 
 static int n8x0_panel_enable(struct omap_dss_device *dssdev)
 {
 	struct panel_drv_data *ddata = to_panel_data(dssdev);
 	int r;
-
-	dev_info(dssdev->dev, "%s\n", __func__);
 
 	if (!omapdss_device_is_connected(dssdev))
 		return -ENODEV;
@@ -849,30 +781,36 @@ static int n8x0_panel_enable(struct omap_dss_device *dssdev)
 		return 0;
 
 	mutex_lock(&ddata->mutex);
+	ddata->in->ops.rfbi->bus_lock(ddata->in);
+
 	r = n8x0_panel_power_on(dssdev);
-	mutex_unlock(&ddata->mutex);
 	if (r)
-		return r;
+		goto out;
 
 	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 
-	return 0;
+out:
+	ddata->in->ops.rfbi->bus_unlock(ddata->in);
+	mutex_unlock(&ddata->mutex);
+	return r;
 }
 
 static void n8x0_panel_disable(struct omap_dss_device *dssdev)
 {
 	struct panel_drv_data *ddata = to_panel_data(dssdev);
 
-	dev_info(dssdev->dev, "%s\n", __func__);
-
 	if (!omapdss_device_is_enabled(dssdev))
 		return;
 
 	mutex_lock(&ddata->mutex);
-	n8x0_panel_power_off(dssdev);
-	mutex_unlock(&ddata->mutex);
+	ddata->in->ops.rfbi->bus_lock(ddata->in);
 
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+	n8x0_panel_power_off(dssdev);
+
+	ddata->in->ops.rfbi->bus_unlock(ddata->in);
+	mutex_unlock(&ddata->mutex);
+
 }
 
 static void n8x0_panel_set_timings(struct omap_dss_device *dssdev,
@@ -920,8 +858,6 @@ static int n8x0_panel_update(struct omap_dss_device *dssdev,
 	struct panel_drv_data *ddata = to_panel_data(dssdev);
 	struct omap_dss_device *dd = ddata->in;
         u16 dw, dh;
-
-//	pr_info("%s(%d,%d %dx%d)\n", __func__, x,y, w,h);
 
         dw = dssdev->panel.timings.x_res;
         dh = dssdev->panel.timings.y_res;
@@ -1004,13 +940,9 @@ static int n8x0_panel_probe(struct spi_device *spi)
 {
 	struct panel_drv_data *ddata;
 	struct omap_dss_device *dssdev;
-	struct backlight_device *bldev;
-	int max_brightness, brightness;
-	struct backlight_properties props;
 	int r;
 
-	dev_warn(&spi->dev, "%s\n", __func__);
-	dev_dbg(&spi->dev, "%s\n", __func__);
+	dev_info(&spi->dev, "%s\n", __func__);
 
 	spi->mode = SPI_MODE_0;
 
@@ -1070,28 +1002,10 @@ static int n8x0_panel_probe(struct spi_device *spi)
 		goto err_detect;
 	}
 
-	memset(&props, 0, sizeof(props));
-	props.fb_blank = FB_BLANK_UNBLANK;
-	props.power = FB_BLANK_UNBLANK;
-	props.type = BACKLIGHT_RAW;
-
-	bldev = backlight_device_register("n8x0_panel", &ddata->spi->dev,
-			ddata, &n8x0_panel_bl_ops, &props);
-	if (IS_ERR(bldev)) {
-		r = PTR_ERR(bldev);
-		goto err_reg_bl;
-	}
-	ddata->bl_dev = bldev;
-
-	max_brightness = 127;
-
-	brightness = n8x0_panel_get_actual_brightness(ddata);
-	brightness = max_brightness;
-
-	bldev->props.max_brightness = max_brightness;
-	bldev->props.brightness = brightness;
-
-	n8x0_panel_bl_update_status(ddata->bl_dev);
+	ddata->bl_dev = devm_of_find_backlight(&ddata->spi->dev);
+	if (IS_ERR(ddata->bl_dev))
+		return PTR_ERR(ddata->bl_dev);
+	dev_info(&spi->dev, "%s: found backlight %px\n", __func__, ddata->bl_dev);
 
 	ddata->videomode = n8x0_panel_timings;
 
@@ -1112,8 +1026,6 @@ static int n8x0_panel_probe(struct spi_device *spi)
 	return 0;
 
 err_reg:
-	backlight_device_unregister(bldev);
-err_reg_bl:
 err_detect:
 err_gpio:
 	omap_dss_put_device(ddata->in);

@@ -956,7 +956,7 @@ static void rfbi_display_disable(struct omap_dss_device *dssdev)
 	mutex_lock(&rfbi->lock);
 
 	dss_mgr_unregister_framedone_handler(out->manager,
-			rfbi_framedone_callback, NULL);
+			rfbi_framedone_callback, dssdev);
 
 	rfbi_runtime_put();
 
