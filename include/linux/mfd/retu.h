@@ -11,11 +11,10 @@
 
 struct retu_dev;
 
+struct regmap *retu_get_regmap(struct retu_dev *);
+
 int retu_read(struct retu_dev *, u8);
 int retu_write(struct retu_dev *, u8, u16);
-
-struct retu_dev* retu_get_dev_retu(void);
-struct retu_dev* retu_get_dev_tahvo(void);
 
 /* Registers */
 #define RETU_REG_ASICR		0x00		/* ASIC ID and revision */
