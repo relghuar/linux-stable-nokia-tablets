@@ -33,7 +33,6 @@
 #include <linux/gpio.h>
 #include <linux/of.h>
 #include <linux/of_gpio.h>
-#include <linux/mfd/retu.h>
 #include <linux/clk.h>
 
 #include <video/omapfb_dss.h>
@@ -101,6 +100,10 @@ struct panel_drv_data {
 
 	int reset_gpio;
 	int powerdown_gpio;
+
+	struct regulator *vtornado;
+	u32 vtornado_on_uV;
+	u32 vtornado_off_uV;
 
 	struct omap_video_timings videomode;
 
@@ -618,21 +621,6 @@ static void blizzard_ctrl_setup_update(struct omap_dss_device *dssdev,
 }
 
 
-static void tahvo_set_clear_reg_bits(unsigned reg, u16 set, u16 clear) {
-	spinlock_t tahvo_lock;
-        unsigned long flags;
-        u16 w;
-
-	spin_lock_init(&tahvo_lock);
-        spin_lock_irqsave(&tahvo_lock, flags);
-        w = retu_read(retu_get_dev_tahvo(), reg);
-        w &= ~clear;
-        w |= set;
-	retu_write(retu_get_dev_tahvo(), reg, w);
-        spin_unlock_irqrestore(&tahvo_lock, flags);
-}
-
-
 static int n8x0_panel_connect(struct omap_dss_device *dssdev)
 {
 	struct panel_drv_data *ddata = to_panel_data(dssdev);
@@ -674,7 +662,7 @@ static int n8x0_panel_power_on(struct omap_dss_device *dssdev)
 			dssdev->ctrl.pixel_size, dssdev->phy.rfbi.data_lines,
 			ddata->enabled);
 
-	tahvo_set_clear_reg_bits(0x07, 0, 0xf);
+	regulator_set_voltage(ddata->vtornado, ddata->vtornado_on_uV, ddata->vtornado_on_uV);
 	msleep(10);
 	clk_enable(ddata->osc_ck);
 	msleep(10);
@@ -766,7 +754,7 @@ static void n8x0_panel_power_off(struct omap_dss_device *dssdev)
 		gpio_set_value(ddata->powerdown_gpio, 0);
 
 	clk_disable(ddata->osc_ck);
-	tahvo_set_clear_reg_bits(0x07, 0xf, 0);
+	regulator_set_voltage(ddata->vtornado, ddata->vtornado_off_uV, ddata->vtornado_off_uV);
 }
 
 static int n8x0_panel_enable(struct omap_dss_device *dssdev)
@@ -920,6 +908,16 @@ static int n8x0_panel_probe_of(struct spi_device *spi)
 	ddata->reset_gpio = of_get_named_gpio(np, "reset-gpios", 0);
 	ddata->powerdown_gpio = of_get_named_gpio(np, "powerdown-gpio", 0);
 
+	ddata->vtornado = devm_regulator_get(&spi->dev, "vtornado");
+	if (IS_ERR(ddata->vtornado)) {
+		int error = PTR_ERR(ddata->vtornado);
+		dev_err(&spi->dev, "error acquiring vtornado regulator: %d", error);
+		return error;
+	}
+
+	of_property_read_u32(np, "vtornado-on-microvolt", &ddata->vtornado_on_uV);
+	of_property_read_u32(np, "vtornado-off-microvolt", &ddata->vtornado_off_uV);
+
 	ddata->in = omapdss_of_find_source_for_first_ep(np);
 	if (IS_ERR(ddata->in)) {
 		dev_err(&spi->dev, "failed to find video source\n");
@@ -963,11 +961,6 @@ static int n8x0_panel_probe(struct spi_device *spi)
 	} else {
 		dev_err(&spi->dev, "OF binding missing!\n");
 		return -ENODEV;
-	}
-
-	if (retu_get_dev_tahvo() == NULL) {
-		dev_err(&spi->dev, "tahvo not initialized yet!\n");
-		return -EPROBE_DEFER;
 	}
 
 	if (gpio_is_valid(ddata->reset_gpio)) {
