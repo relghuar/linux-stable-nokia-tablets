@@ -52,6 +52,10 @@
 	retu_rtc: retu_rtc {
 		compatible = "nokia,retu,rtc";
 	};
+	retu_regs: retu_regs {
+		compatible = "nokia,retu,regs";
+		nregs = <0x20>;
+	};
 };
 
 &tahvo {
@@ -64,6 +68,10 @@
 		regulator-min-microvolt = <1005000>;
 		regulator-max-microvolt = <1475000>;
 		regulator-always-on;
+	};
+	tahvo_regs: tahvo_regs {
+		compatible = "nokia,retu,regs";
+		nregs = <0x0e>;
 	};
 };
 
