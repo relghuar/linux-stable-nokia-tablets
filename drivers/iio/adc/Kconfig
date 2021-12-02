@@ -1222,6 +1222,17 @@ config TWL4030_MADC
 	  This driver can also be built as a module. If so, the module will be
 	  called twl4030-madc.
 
+config RETU_MADC
+	tristate "Retu/Vilma MADC (Monitoring A/D Converter)"
+	depends on MFD_RETU
+	help
+	  This driver provides support for Nokia Retu/Tahvo ASIC MADC. The
+	  driver allows monitoring battery voltage, type and temperature,
+	  charger voltage and others.
+
+	  This driver can also be built as a module. If so, the module will be
+	  called retu-madc.
+
 config TWL6030_GPADC
 	tristate "TWL6030 GPADC (General Purpose A/D Converter) Support"
 	depends on TWL4030_CORE
