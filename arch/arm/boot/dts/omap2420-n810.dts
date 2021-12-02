@@ -16,6 +16,14 @@
 		regulator-max-microvolt = <1800000>;
 	};
 
+	vaux_ape: vaux_ape {
+		// Menelaus-controlled output - no dt-binding so far
+		compatible = "regulator-fixed";
+		regulator-name = "vaux_ape";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+	};
+
 	v28_aic: v28_aic {
 		compatible = "regulator-fixed";
 		regulator-name = "v28_aic";
@@ -46,16 +54,43 @@
 			120 121 122 123 124 125 126 127>;
 		default-brightness-level = <100>;
 	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		slide-switch {
+			label = "Keyboard Slide Switch";
+			gpios = <&gpio4 14 GPIO_ACTIVE_HIGH>; /* gpio110 */
+			linux,input-type = <EV_SW>;
+			linux,code = <SW_KEYPAD_SLIDE>;
+			wakeup-source;
+		};
+
+		headphone-ind {
+			label = "Headphone Indicator";
+			gpios = <&gpio4 11 GPIO_ACTIVE_LOW>; /* gpio107 */
+			linux,input-type = <EV_SW>;
+			linux,code = <SW_HEADPHONE_INSERT>;
+		};
+	};
 };
 
 &retu {
 	retu_rtc: retu_rtc {
 		compatible = "nokia,retu,rtc";
 	};
+	retu_madc: retu_madc {
+		compatible = "nokia,retu-madc";
+		#io-channel-cells = <1>;
+	};
 	retu_regs: retu_regs {
 		compatible = "nokia,retu,regs";
 		nregs = <0x20>;
 	};
+};
+
+&tmp105 {
+	vs-supply = <&vaux_ape>;
 };
 
 &tahvo {
@@ -122,6 +157,17 @@
 			OMAP2420_CORE_IOPAD(0x00cd, PIN_OUTPUT | MUX_MODE0)     /* dss_hsync/csx */
 			OMAP2420_CORE_IOPAD(0x00ce, PIN_OUTPUT | MUX_MODE0)     /* dss_acbias/data_en/cmd */
 		>;
+	};
+};
+
+&i2c1 {
+	/*
+	 * Temperature Sensor
+	 * https://www.ti.com/lit/ds/symlink/tmp105.pdf
+	 */
+	tmp105: tmp105@48 {
+		compatible = "ti,tmp105";
+		reg = <0x48>;
 	};
 };
 
