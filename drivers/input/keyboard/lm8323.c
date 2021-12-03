@@ -748,11 +748,10 @@ static int lm8323_probe(struct i2c_client *client,
 		return -EINVAL;
 	}
 
-	lm = kzalloc(sizeof *lm, GFP_KERNEL);
-	idev = input_allocate_device();
+	lm = devm_kzalloc(&client->dev, sizeof *lm, GFP_KERNEL);
+	idev = devm_input_allocate_device(&client->dev);
 	if (!lm || !idev) {
-		err = -ENOMEM;
-		goto fail1;
+		return -ENOMEM;
 	}
 
 	lm->client = client;
@@ -790,8 +789,7 @@ static int lm8323_probe(struct i2c_client *client,
 	/* If a true probe check the device */
 	if (lm8323_read_id(lm, data) != 0) {
 		dev_err(&client->dev, "device not found\n");
-		err = -ENODEV;
-		goto fail1;
+		return -ENODEV;
 	}
 
 	for (pwm = 0; pwm < LM8323_NUM_PWMS; pwm++) {
@@ -828,11 +826,11 @@ static int lm8323_probe(struct i2c_client *client,
 		goto fail3;
 	}
 
-	err = request_threaded_irq(client->irq, NULL, lm8323_irq,
-			  IRQF_TRIGGER_LOW|IRQF_ONESHOT, "lm8323", lm);
+	err = devm_request_threaded_irq(&client->dev, client->irq, NULL, lm8323_irq,
+			  IRQF_TRIGGER_LOW|IRQF_ONESHOT, dev_name(&client->dev), lm);
 	if (err) {
 		dev_err(&client->dev, "could not get IRQ %d\n", client->irq);
-		goto fail4;
+		goto fail3;
 	}
 
 	i2c_set_clientdata(client, lm);
@@ -842,18 +840,12 @@ static int lm8323_probe(struct i2c_client *client,
 
 	return 0;
 
-fail4:
-	input_unregister_device(idev);
-	idev = NULL;
 fail3:
 	device_remove_file(&client->dev, &dev_attr_disable_kp);
 fail2:
 	while (--pwm >= 0)
 		if (lm->pwm[pwm].enabled)
 			led_classdev_unregister(&lm->pwm[pwm].cdev);
-fail1:
-	input_free_device(idev);
-	kfree(lm);
 	return err;
 }
 
@@ -863,7 +855,6 @@ static int lm8323_remove(struct i2c_client *client)
 	int i;
 
 	disable_irq_wake(client->irq);
-	free_irq(client->irq, lm);
 
 	input_unregister_device(lm->idev);
 
@@ -872,8 +863,6 @@ static int lm8323_remove(struct i2c_client *client)
 	for (i = 0; i < 3; i++)
 		if (lm->pwm[i].enabled)
 			led_classdev_unregister(&lm->pwm[i].cdev);
-
-	kfree(lm);
 
 	return 0;
 }
