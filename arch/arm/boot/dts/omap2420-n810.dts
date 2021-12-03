@@ -89,10 +89,6 @@
 	};
 };
 
-&tmp105 {
-	vs-supply = <&vaux_ape>;
-};
-
 &tahvo {
 	tahvo_ledpwm: tahvo_ledpwm {
 		compatible = "nokia,tahvo,ledpwm";
@@ -168,6 +164,7 @@
 	tmp105: tmp105@48 {
 		compatible = "ti,tmp105";
 		reg = <0x48>;
+		vs-supply = <&vaux_ape>;
 	};
 };
 
