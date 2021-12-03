@@ -127,7 +127,7 @@ static int retu_madc_read_raw(struct iio_dev *indio_dev,
 			 *  ...
 			 *   0k        |  0x1A0
 			 */
-			if (ret <= 0x190)
+			if (ret <= 0x1A0)
 				ret = 0;
 			else
 				ret = (ret - 0x1A0) * 229;

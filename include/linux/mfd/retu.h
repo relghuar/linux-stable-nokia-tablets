@@ -50,7 +50,9 @@ int retu_write(struct retu_dev *, u8, u16);
 #define RETU_INT_HOOK		6
 #define RETU_INT_HEAD		7
 #define RETU_INT_ADCS		8
+
 #define TAHVO_INT_VBUS		0		/* VBUS state */
+#define TAHVO_INT_BATCURR	7		/* Battery current measure timer */
 
 /* Interrupt status */
 #define TAHVO_STAT_VBUS		(1 << TAHVO_INT_VBUS)
