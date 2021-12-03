@@ -576,7 +576,7 @@ static int init_pwm(struct lm8323_chip *lm, int id, struct device *dev,
 		pwm->cdev.name = name;
 		pwm->cdev.brightness_set = lm8323_pwm_set_brightness;
 		pwm->cdev.groups = lm8323_pwm_groups;
-		if (led_classdev_register(dev, &pwm->cdev) < 0) {
+		if (devm_led_classdev_register(dev, &pwm->cdev) < 0) {
 			dev_err(dev, "couldn't register PWM %d\n", id);
 			return -1;
 		}
@@ -796,13 +796,10 @@ static int lm8323_probe(struct i2c_client *client,
 		err = init_pwm(lm, pwm + 1, &client->dev,
 			       pdata->pwm_names[pwm]);
 		if (err < 0)
-			goto fail2;
+			return err;
 	}
 
 	lm->kp_enabled = true;
-	err = device_create_file(&client->dev, &dev_attr_disable_kp);
-	if (err < 0)
-		goto fail2;
 
 	idev->name = pdata->name ? : "LM8323 keypad";
 	snprintf(lm->phys, sizeof(lm->phys),
@@ -822,47 +819,36 @@ static int lm8323_probe(struct i2c_client *client,
 
 	err = input_register_device(idev);
 	if (err) {
-		dev_dbg(&client->dev, "error registering input device\n");
-		goto fail3;
+		dev_err(&client->dev, "error registering input device (%d)\n", err);
+		return err;
 	}
 
 	err = devm_request_threaded_irq(&client->dev, client->irq, NULL, lm8323_irq,
 			  IRQF_TRIGGER_LOW|IRQF_ONESHOT, dev_name(&client->dev), lm);
 	if (err) {
 		dev_err(&client->dev, "could not get IRQ %d\n", client->irq);
-		goto fail3;
+		return err;
+	}
+
+	err = device_create_file(&client->dev, &dev_attr_disable_kp);
+	if (err < 0) {
+		dev_err(&client->dev, "error creating 'enable' device file (%d)\n", err);
+		return err;
 	}
 
 	i2c_set_clientdata(client, lm);
 
 	device_init_wakeup(&client->dev, 1);
-	enable_irq_wake(client->irq);
+	irq_set_irq_wake(client->irq, 1);
 
 	return 0;
-
-fail3:
-	device_remove_file(&client->dev, &dev_attr_disable_kp);
-fail2:
-	while (--pwm >= 0)
-		if (lm->pwm[pwm].enabled)
-			led_classdev_unregister(&lm->pwm[pwm].cdev);
-	return err;
 }
 
 static int lm8323_remove(struct i2c_client *client)
 {
 	struct lm8323_chip *lm = i2c_get_clientdata(client);
-	int i;
-
-	disable_irq_wake(client->irq);
-
-	input_unregister_device(lm->idev);
 
 	device_remove_file(&lm->client->dev, &dev_attr_disable_kp);
-
-	for (i = 0; i < 3; i++)
-		if (lm->pwm[i].enabled)
-			led_classdev_unregister(&lm->pwm[i].cdev);
 
 	return 0;
 }
