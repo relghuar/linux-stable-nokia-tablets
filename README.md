@@ -10,7 +10,7 @@ Code quality of most changes is awful; main goal for now is to get the hardware 
 
 - LCD panel using old omap2fb system, no DRM yet
   - gpio1 and dispc require no-reset-on-init hwmod flag to the panel work properly (gpio1 because of LCD_RESET, no idea why dispc)
-- LCD backlight
+- LCD backlight with smooth PWM control (127 levels)
 - touchscreen
 - keyboard with backlight, lm8323 driver adjusted for dt-bindings
   - whole driver should be rewritten using matrix-keypad framework
@@ -18,17 +18,47 @@ Code quality of most changes is awful; main goal for now is to get the hardware 
 - wifi
   - depends on nasty workaround for mcspi fifo dma problem, see [bellow](#wifi)
 
+## Not working
+
+**Full suspend/resume**
+
+Device can be put to sleep using 'echo mem >/sys/power/state', it also wakes up after a short delay by sliding the keyboard open. Normal keys don't seem to work as a wake-up source, neither does the power key.
+lm8323 does register itself as a wakeup source so any key should work in theory; it's possible suspend mode cuts its power, or the wake registration or irq handling is not done right. I confirmed in run mode the keys do increase the counter in /proc/interrupt:
+- 48:         14      INTC  32 Edge      4801e000.gpio
+Bigger problem is the retu watchdog. If the device stays in sleep long enough for it to expire, it kicks in and turns everything off. This watchdog apparently cannot be disabled, it seems the only solution would be having retu-rtc wake the device up briefly at least every 50-60s, write the watchdog and go back to sleep (retu-rtc driver will need to support alarms first).
+Waking up periodically just to do some background work will probably be necessary anyway, to handle stuff like wifi.
+
+
 ## Not tested
 
 - Bluetooth
-- Full suspend/resume
 - Audio
+
+
+## Work in progress
+
+**Retu & Tahvo**
+
+- battery management
+  - retu-madc iio driver provides access to battery and charger voltage, BSI and battery temperature
+    - Vbat and Vchg are converted to mV reasonably well according to manual measurements
+    - BSI is converted to mOhm approximately using table from old openwrt 3.3 kernel source
+    - temperature is just raw adc reading for now, inverse proportional (302 -> room temp ~23dC, 220 alread quite warm to the touch, ~40-45dC??)
+  - retu-regs used for now to allow user-space access to Retu status register -> check for battery and charger presence
+  - same retu-regs used to read battery current from Tahvo, and control charging PWM output
+  - very basic userspace charger written in bash works reasonably well
+  - charging system is generally only working "reasonably well" ; even the original firmware produces very jumpy current flow from charger (checked with oscilloscope)
+    - if the battery is discharged enough, PWM goes to 100%, current consumption from charger is stable, Vchg and Vbat are pretty much the same as reported by retu-madc
+    - low battery can pull Vchg from 4.95V on the charger to as low as 3.8V on ADC while pulling >650mA from the charger -> ~ 1.15V x 0.65A = 3/4W wasted somewhere between the cable, connector and filter
+    - when Vbat climbs to ~4.1V the PWM goes lower, but it does not lower the current smoothly. Instead, it seems the current gets fully open in short bursts in periods of 1s and longer, depending on exact PWM register value. It almost looks like a PWM with a period of 1-1.2s, as ridiculous as that sounds. It would be nice to have someone else reproducing this behavior, my device DID survive several days flood, fully submerged in river water... It's pretty amazing it still works, doesn't mean everything works as it should.
+
+- retu-rtc driver is still missing alarm implementation ; probably crucial for stable suspend/resume handling
 
 
 ## Next steps:
 
-- remove LCD panel driver dependency on direct Retu/Tahvo access
-  - Vtornado power for S1D13745 probably needs some kind of regulator driver attached as tahvo mfd cell
+- *remove LCD panel driver dependency on direct Retu/Tahvo access*
+  - **DONE:** Vtornado power for S1D13745 is controlled by vcore-tahvo-regulator and backlight uses leds-tahvo driver, both attached to the Tahvo MFD using dt-bindings
 
 - try to upstream lm8323 driver patches for dt-bindings and standard matrix-keypad
 
@@ -40,7 +70,12 @@ Code quality of most changes is awful; main goal for now is to get the hardware 
 
 - start adding retu/tahvo drivers for battery management
   - because of lack of documentation of both chips, best source will probably be latest reasonable [openwrt patches for v3.3 kernel](https://git.openwrt.org/?p=openwrt/openwrt.git;a=tree;f=target/linux/omap24xx/patches-3.3;hb=fa097e5ae5fddb82a077a0bb1676a512fa2d908e), as well as original (even more ancient) [vendor sources](http://repository.maemo.org/pool/maemo4.1.2/free/k/kernel-source-diablo/)
-  - first step will probably be some debug readout (sysfs?) of all registers from both retu and tahvo chips
+  - *first step will probably be some debug readout (sysfs?) of all registers from both retu and tahvo chips*
+    - **DONE:** retu-regs driver exports both Retu and Tahvo registers into sysfs. I have already
+
+- battery management
+  - current monitoring could probably use another iio adc driver? (trivial single-channel with on/off control and interrupt trigger??)
+  - does it make sense to create regulator driver for charging-pwm control? or put it directly into the power/supply/ driver?
 
 - fix mcspi fifo dma issue for 16-bit spi transfers to have wifi working without the hack (no idea where to start without SoC docs)
 
@@ -53,7 +88,7 @@ The display is composed of two parts:
 - panel itself, a Sharp LS041Y3 connected to SPI1 using MIPID command protocol and LCD_RESET signal
 - external framebuffer Epson S1D13745 connected to the RFBI interface (DSS DBI), using both LCD_RESET and POWERDOWN signals
 
-The powerdown seems to work fine (power consumption has to be investigated), pulling it down on display_disable still allows for successful wakeup.
+The powerdown gpio seems to work fine (power consumption has to be investigated), pulling it down on display_disable still allows for successful wakeup.
 
 Reset is tricky, pulling it down either on blank/suspend or by powerup hwmod reset renders the display unusable (it simply stays black). It is currently not clear if the issue is with framebuffer or panel or both. **This needs further investigation.**
 To work around this for now, gpio1 hwmod reset-on-init has to be skipped to keep it up from NOLO, and we have to avoid pulling it down during blank or standby.
@@ -94,7 +129,11 @@ I've started porting p54spi itself to OF probing - it works already and has been
 ## Retu/Tahvo
 
 Any reasonable new drivers for lcd backlight, framebuffer power control and general battery management will need additional patching of main retu-mfd driver, to allow mfd cells registering from dt-bindings. This has already been started for the tahvo-ledpwm driver, however it should probably be extended to allow full mfd_cell capabilities like id, reg address, resources and such. At the very least it should support irq resources as those are already used in existing cell drivers like retu-powerbtn, and will for sure be necessary for charging control.
+- tahvo-ledpwm, vcore-tahvo-regulator and retu-madc are the first working prototypes, as well as retu-regs used for debug/test access
 
+
+
+######
 # QEMU notes
 
 I'm using qemu to ease basic development. It was really priceless to get rfbi and lcd control working, at least to memory/register level.
