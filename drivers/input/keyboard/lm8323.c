@@ -137,6 +137,7 @@ struct lm8323_chip {
 	struct i2c_client	*client;
 	struct input_dev	*idev;
 	bool			kp_enabled;
+	int			wakeup;
 	bool			pm_suspend;
 	unsigned		keys_down;
 	char			phys[32];
@@ -371,8 +372,11 @@ static irqreturn_t lm8323_irq(int irq, void *_lm)
 	mutex_lock(&lm->lock);
 
 	while ((lm8323_read(lm, LM8323_CMD_READ_INT, &ints, 1) == 1) && ints) {
-		if (likely(ints & INT_KEYPAD))
+		if (likely(ints & INT_KEYPAD)) {
+			if (lm->wakeup)
+				pm_wakeup_event(&lm->client->dev, 0);
 			process_keys(lm);
+		}
 		if (ints & INT_ROTATOR) {
 			/* We don't currently support the rotator. */
 			dev_vdbg(&lm->client->dev, "rotator fired\n");
@@ -694,6 +698,8 @@ struct lm8323_platform_data *lm8323_of_populate_pdata(struct device *dev)
 	device_property_read_u32(dev, "active-ms", &pdata->active_time);
 	pdata->repeat = device_property_read_bool(dev, "repeat");
 
+	pdata->wakeup = device_property_read_bool(dev, "wakeup-source");
+
 	count = device_property_read_string_array(dev, "pwm-names", NULL, 0);
 	if (count > LM8323_NUM_PWMS) {
 		dev_warn(dev, "too many pwm-names specified: %d (max. %d)\n",
@@ -757,6 +763,8 @@ static int lm8323_probe(struct i2c_client *client,
 	lm->client = client;
 	lm->idev = idev;
 	mutex_init(&lm->lock);
+
+	lm->wakeup = pdata->wakeup;
 
 	lm->size_x = pdata->size_x;
 	lm->size_y = pdata->size_y;
@@ -838,8 +846,10 @@ static int lm8323_probe(struct i2c_client *client,
 
 	i2c_set_clientdata(client, lm);
 
-	device_init_wakeup(&client->dev, 1);
-	irq_set_irq_wake(client->irq, 1);
+	if (lm->wakeup) {
+		device_init_wakeup(&client->dev, 1);
+		irq_set_irq_wake(client->irq, 1);
+	}
 
 	return 0;
 }
@@ -864,8 +874,10 @@ static int lm8323_suspend(struct device *dev)
 	struct lm8323_chip *lm = i2c_get_clientdata(client);
 	int i;
 
-	irq_set_irq_wake(client->irq, 0);
-	disable_irq(client->irq);
+	if (!lm->wakeup) {
+		irq_set_irq_wake(client->irq, 0);
+		disable_irq(client->irq);
+	}
 
 	mutex_lock(&lm->lock);
 	lm->pm_suspend = true;
@@ -892,8 +904,10 @@ static int lm8323_resume(struct device *dev)
 		if (lm->pwm[i].enabled)
 			led_classdev_resume(&lm->pwm[i].cdev);
 
-	enable_irq(client->irq);
-	irq_set_irq_wake(client->irq, 1);
+	if (!lm->wakeup) {
+		enable_irq(client->irq);
+		irq_set_irq_wake(client->irq, 1);
+	}
 
 	return 0;
 }
