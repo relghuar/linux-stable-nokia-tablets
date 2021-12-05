@@ -71,7 +71,15 @@
 			gpios = <&gpio4 11 GPIO_ACTIVE_LOW>; /* gpio107 */
 			linux,input-type = <EV_SW>;
 			linux,code = <SW_HEADPHONE_INSERT>;
+			wakeup-source;
 		};
+	};
+
+	/* controlled (enabled/disabled) directly by BC4-ROM and STLC4560 */
+	vctcxo: vctcxo {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <38400000>;
 	};
 };
 
@@ -198,6 +206,7 @@
 		compatible = "ti,lm8323";
 		reg = <0x45>;
 		interrupts-extended = <&gpio4 13 IRQ_TYPE_LEVEL_LOW>; // gpio109
+		wakeup-source;
 
 		label = "Internal keyboard";
 		pwm-names = "n810::keyboard", "n810::cover";
@@ -269,6 +278,13 @@
 			MATRIX_KEY(0x07, 0x00, KEY_I)
 			MATRIX_KEY(0x07, 0x04, KEY_KPENTER)
 			>;
+	};
+
+	tsl2563: tsl2563@29 {
+		compatible = "amstaos,tsl2563";
+		reg = <0x29>;
+		interrupts-extended = <&gpio2 3 IRQ_TYPE_EDGE_RISING>; /* 35 */
+		amstaos,cover-comp-gain = <16>;
 	};
 
 	lp5521@32 {
