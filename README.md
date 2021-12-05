@@ -6,6 +6,7 @@ This branch is based on linux-stable-rc 5.15.x, with additional changes for Noki
 Eventual goal is to get as much as possible patched into the upstream kernel.
 Code quality of most changes is awful; main goal for now is to get the hardware working.
 
+
 ## Working
 
 - LCD panel using old omap2fb system, no DRM yet
@@ -17,21 +18,30 @@ Code quality of most changes is awful; main goal for now is to get the hardware 
 - RGB LED in top left corner, working almost out-of-the-box with upstream lp5521 driver, just needed correct dt-bindings
 - wifi
   - depends on nasty workaround for mcspi fifo dma problem, see [bellow](#wifi)
+- USB
+  - gadget subsystem works fine, ethernet connection via usb tested
+  - host system **not** tested yet
+
 
 ## Not working
 
 **Full suspend/resume**
 
-Device can be put to sleep using 'echo mem >/sys/power/state', it also wakes up after a short delay by sliding the keyboard open. Normal keys don't seem to work as a wake-up source, neither does the power key.
-lm8323 does register itself as a wakeup source so any key should work in theory; it's possible suspend mode cuts its power, or the wake registration or irq handling is not done right. I confirmed in run mode the keys do increase the counter in /proc/interrupt:
-- 48:         14      INTC  32 Edge      4801e000.gpio
-Bigger problem is the retu watchdog. If the device stays in sleep long enough for it to expire, it kicks in and turns everything off. This watchdog apparently cannot be disabled, it seems the only solution would be having retu-rtc wake the device up briefly at least every 50-60s, write the watchdog and go back to sleep (retu-rtc driver will need to support alarms first).
+Device can be put to sleep using 'echo mem >/sys/power/state', it also wakes up successfully if the wakeup event comes quick enough (before retu-watchdog kills everything). Both sliding the keyboard open as well as any standard keys connected to lm8323 chip work fine (after patching the driver to handle suspend/wakeup correctly). Power button does not seem to work as wakeup source (there is no support in the driver).
+Big problem is the retu watchdog. If the device stays in sleep long enough for it to expire, it kicks in and turns everything off. This watchdog apparently cannot be disabled, it seems the only solution would be having retu-rtc wake the device up briefly at least every 50-60s, write the watchdog and go back to sleep (retu-rtc driver will need to support alarms first).
+- perhaps some other timer-wakeup could be used? retu-rtc seems to be a barely working mess... **needs testing**
 Waking up periodically just to do some background work will probably be necessary anyway, to handle stuff like wifi.
+
+**Bluetooth**
+
+N810 uses BC4-ROM chip, almost certainly CSR BlueCore using HCI-UART BCSP protocol. There is support for protocol itself in the kernel.
+"hci_nokia" driver can be activated via dt-bindings including all gpios, however it fails no the protocol negotiation (most likely because it's not compatible with bcsp).
+- there is a "Frame reassembly failed" error in hci_nokia.c::nokia_recv(), caused by hci_h4.c::h4_recv_buf(). There seems to be 60 bytes response coming from the device with packet type 0x00, which is not listed in hci_nokia.c::nokia_recv_pkts list.
+New device driver will have to be written, combining OF probing and initialization from hci_nokia but using BCSP as uart protocol.
 
 
 ## Not tested
 
-- Bluetooth
 - Audio
 
 
@@ -43,14 +53,17 @@ Waking up periodically just to do some background work will probably be necessar
   - retu-madc iio driver provides access to battery and charger voltage, BSI and battery temperature
     - Vbat and Vchg are converted to mV reasonably well according to manual measurements
     - BSI is converted to mOhm approximately using table from old openwrt 3.3 kernel source
-    - temperature is just raw adc reading for now, inverse proportional (302 -> room temp ~23dC, 220 alread quite warm to the touch, ~40-45dC??)
+    - temperature is just raw adc reading for now, inverse proportional (302 -> room temp ~23dC, 220 already warm to the touch, ~37-40dC??)
   - retu-regs used for now to allow user-space access to Retu status register -> check for battery and charger presence
   - same retu-regs used to read battery current from Tahvo, and control charging PWM output
   - very basic userspace charger written in bash works reasonably well
   - charging system is generally only working "reasonably well" ; even the original firmware produces very jumpy current flow from charger (checked with oscilloscope)
-    - if the battery is discharged enough, PWM goes to 100%, current consumption from charger is stable, Vchg and Vbat are pretty much the same as reported by retu-madc
-    - low battery can pull Vchg from 4.95V on the charger to as low as 3.8V on ADC while pulling >650mA from the charger -> ~ 1.15V x 0.65A = 3/4W wasted somewhere between the cable, connector and filter
+    - according to openwrt-linux-3.3, actual Ibat is 1/3 of the BATCURR reported by Tahvo ; preliminary observations confirm that. More precise tests pending until I set up external logging of Vbat/Ibat and Vchg/Ichg values independent of N810 itself. (interesting not-very-relevant todo: get Vchg measured at multiple points ; external / pcb connection of charge connector / same point as retu-madc)
+    - if the battery is discharged enough, PWM goes to 100%, current consumption from charger is stable, Vchg and Vbat are pretty much the same as reported by retu-madc (Vchg =~ Vbat+80mV)
+    - low battery can pull Vchg from 4.95V on the charger to as low as 3.8V on ADC while pulling >750mA from the charger -> ~ 1.15V x 0.75A = 0.86W wasted somewhere between the cable, connector and filter
+    - it seems max. Ibat in CC mode does not exceed ~800mA. With blanked screen and cpu ~50% without any idling, even this full-current charging does not get the battery over ~40dC.
     - when Vbat climbs to ~4.1V the PWM goes lower, but it does not lower the current smoothly. Instead, it seems the current gets fully open in short bursts in periods of 1s and longer, depending on exact PWM register value. It almost looks like a PWM with a period of 1-1.2s, as ridiculous as that sounds. It would be nice to have someone else reproducing this behavior, my device DID survive several days flood, fully submerged in river water... It's pretty amazing it still works, doesn't mean everything works as it should.
+  - Counterintuitive fun-fact: charging works a lot better with a low-power charger (like 5V/700mA) - that way Tahvo can run on 100% PWM longer because a part of voltage-drop happens outside. Also the CV charging is a bit better because Vbat spread is tighter ; battery can be charged to higher "minimal" voltage while still keeping the maximum under threshold.
 
 - retu-rtc driver is still missing alarm implementation ; probably crucial for stable suspend/resume handling
 
@@ -80,7 +93,10 @@ Waking up periodically just to do some background work will probably be necessar
 - fix mcspi fifo dma issue for 16-bit spi transfers to have wifi working without the hack (no idea where to start without SoC docs)
 
 
+
+######
 # Hardware notes
+
 
 ## LCD
 
@@ -94,6 +110,7 @@ Reset is tricky, pulling it down either on blank/suspend or by powerup hwmod res
 To work around this for now, gpio1 hwmod reset-on-init has to be skipped to keep it up from NOLO, and we have to avoid pulling it down during blank or standby.
 Another module needing no-reset-on-init is dss **dispc** ; although funny enough both **dss** and **rfbi** can be reset just fine. Another point to investigate, there must be something missing in dss initialization sequence (possibly in rfbi?).
 
+
 ## Backlight
 
 There are 2 kinds of backlights on N810:
@@ -101,6 +118,7 @@ There are 2 kinds of backlights on N810:
 - **keyboard backlight** driven by PWM_0 output of lm8323 keyboard chip ; this one works fine. There are 3 such pwm outputs, and according to vendor kernel there should be another backlight connected to PWM_1 (named "cover" in board init code), however both PWM_1 and PWM_2 seem to be unconnected according to rx-44 schematics and actually trying to use it on real N810 has no visible effect. Most probably there is only one backlight available, for the main keyboard.
 
 - **LCD backlight** provided by PWM300 output of the Betty/Tahvo chip ; this is controlled by one of the registers in tahvo mfd and allows for 127 levels of brightness. There is already a leds-tahvo.c driver in this branch, attached to panel via standard led-backlight driver using dt-bindings. Blanking works, although power consumption is probably not ideal as there are still some suspend/resume operations missing for the framebuffer chip. The driver for tahvo-ledpwm is quite simple and should not be difficult to get accepted upstream, after patching OF bindings into retu-mfd driver (see [Retu/Tahvo](#retu-tahvo)).
+
 
 ## RTC
 
@@ -116,6 +134,7 @@ According to the N810 schematics, there are several issues here:
   - There is alarm functionality included, seems to be a single hour+minute register so only one alarm can be active at a time. If it's really not possible to set HMR time register, using the alarm referenced to it will be quite cumbersome. RTC would of course be useless for timekeeping, and actual hour:minute of any alarm would have to be "converted" to corresponding rtc-relative time. This would probably have to be performed by the driver internally.
   - TODO: next time I have the device disassembled, check RTC battery status (close to mini-SD slot according to pcb drawing) - it's ancient, and the device survived an actual flood, so it's likely dead...
 
+
 ## Wifi
 
 The p54spi driver uses 16-bit spi protocol, which apparently does not play well with OMAP2420's mcspi/fifo/dma configuration in current kernel, at least for 2-byte transfer. Perhaps it's for any non-8-bit mode, although LCD display uses 10bit transfers in some situations as well and it seems to work. Maybe it does not use spi fifo as it only transfers 3-4 bytes at a time, or there is some difference between 10 and 16 bit mode I'm not aware of. I'm not yet familiar enough with omap2 internals to really tell - it's also possible spi/fifo/dma combination is only usable for 8-bit modes on the omap2420; there's nothing to do here really until I get my hands on the right TRM.
@@ -125,6 +144,7 @@ There was a similar issue reported for N900 (OMAP3530) some years ago [here](htt
 The only way I managed to get wifi working was to reduce wait times for EOW and TXFFE bits in mcspi driver to 10ms and simply ignore any timeouts. Wifi comes up like this, and runs stably at around 50kbps speeds. Definitely not a long-term solution, but enough for further development.
 
 I've started porting p54spi itself to OF probing - it works already and has been removed from the board init code, however it still uses module parameters for GPIOs, as well as probably some other hardcoded values which could all be moved to devicetree.
+
 
 ## Retu/Tahvo
 
