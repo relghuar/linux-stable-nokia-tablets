@@ -16,6 +16,7 @@ Code quality of most changes is awful; main goal for now is to get the hardware 
 - keyboard with backlight, lm8323 driver adjusted for dt-bindings
   - whole driver should be rewritten using matrix-keypad framework
 - RGB LED in top left corner, working almost out-of-the-box with upstream lp5521 driver, just needed correct dt-bindings
+- tsl2563 ALS sensor, providing illumination data over IIO
 - wifi
   - depends on nasty workaround for mcspi fifo dma problem, see [bellow](#wifi)
 - USB

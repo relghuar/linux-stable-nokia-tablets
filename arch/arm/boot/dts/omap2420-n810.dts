@@ -52,7 +52,7 @@
 			104 105 106 107 108 109 110 111
 			112 113 114 115 116 117 118 119
 			120 121 122 123 124 125 126 127>;
-		default-brightness-level = <100>;
+		default-brightness-level = <24>;
 	};
 
 	gpio-keys {
@@ -308,16 +308,16 @@
 			reg = <1>;
 			color = <LED_COLOR_ID_GREEN>;
 			chan-name = "green";
-			led-cur = /bits/ 8 <0x2f>;
+			led-cur = /bits/ 8 <0x02>;
 			max-cur = /bits/ 8 <0x5f>;
+			linux,default-trigger = "heartbeat";
 		};
 		chan@2 {
 			reg = <2>;
 			color = <LED_COLOR_ID_BLUE>;
 			chan-name = "blue";
-			led-cur = /bits/ 8 <0x2f>;
+			led-cur = /bits/ 8 <0x02>;
 			max-cur = /bits/ 8 <0x5f>;
-			linux,default-trigger = "heartbeat";
 		};
 
 	};
