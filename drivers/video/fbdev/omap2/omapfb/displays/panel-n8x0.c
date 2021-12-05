@@ -165,69 +165,6 @@ static const struct rfbi_timings n8x0_panel_rfbi_timings = {
 
 #define to_panel_data(p) container_of(p, struct panel_drv_data, dssdev)
 
-#define SPI_VER 4
-
-#if (SPI_VER == 3)
-
-// exact copy from a working 3.10 kernel - NOT working either in qemu nor n810!
-static void n8x0_panel_transfer(struct panel_drv_data *ddata, int cmd, const u8 *wbuf,
-                int wlen, u8 *rbuf, int rlen)
-{
-        struct spi_message      m;
-        struct spi_transfer     *x, xfer[4];
-        u16                     w;
-        int                     r;
-
-        spi_message_init(&m);
-
-        memset(xfer, 0, sizeof(xfer));
-        x = &xfer[0];
-
-        cmd &=  0xff;
-        x->tx_buf               = &cmd;
-        x->bits_per_word        = 9;
-        x->len                  = 2;
-        spi_message_add_tail(x, &m);
-
-        if (wlen) {
-                x++;
-                x->tx_buf               = wbuf;
-                x->len                  = wlen;
-                x->bits_per_word        = 9;
-                spi_message_add_tail(x, &m);
-        }
-
-        if (rlen) {
-                x++;
-                x->rx_buf       = &w;
-                x->len          = 1;
-                spi_message_add_tail(x, &m);
-
-                if (rlen > 1) {
-                        /* Arrange for the extra clock before the first
-                         * data bit.
-                         */
-                        x->bits_per_word = 9;
-                        x->len           = 2;
-
-                        x++;
-                        x->rx_buf        = &rbuf[1];
-                        x->len           = rlen - 1;
-                        spi_message_add_tail(x, &m);
-                }
-        }
-
-        r = spi_sync(ddata->spi, &m);
-        if (r < 0)
-                dev_dbg(&ddata->spi->dev, "spi_sync %d\n", r);
-
-        if (rlen)
-                rbuf[0] = w & 0xff;
-}
-
-#elif (SPI_VER == 4) 
-
-// function from 4.19 kernel, panel acx565akm - works on n810 but not in qemu because of 10bit
 static void n8x0_panel_transfer(struct panel_drv_data *ddata, int cmd,
                               const u8 *wbuf, int wlen, u8 *rbuf, int rlen)
 {
@@ -278,60 +215,6 @@ static void n8x0_panel_transfer(struct panel_drv_data *ddata, int cmd,
                 dev_dbg(&ddata->spi->dev, "spi_sync %d\n", r);
 }
 
-#elif (SPI_VER == 99)
-
-// custom version built from 3.10.108 to work in qemu - does NOT work on real n810!
-static void n8x0_panel_transfer(struct panel_drv_data *ddata, int cmd,
-			      const u8 *wbuf, int wlen, u8 *rbuf, int rlen)
-{
-	struct spi_message	m;
-	struct spi_transfer	*x, xfer[5];
-	u16			w;
-	int			r;
-
-	BUG_ON(ddata->spi == NULL);
-	dev_info(&ddata->spi->dev, "%s(%02x, %d, %d)\n", __func__, cmd, wlen, rlen);
-
-	spi_message_init(&m);
-
-	memset(xfer, 0, sizeof(xfer));
-	x = &xfer[0];
-
-	cmd &=  0xff;
-	x->tx_buf		= &cmd;
-	x->bits_per_word	= 9;
-	x->len			= 2;
-	spi_message_add_tail(x, &m);
-
-	if (wlen) {
-		x++;
-		x->tx_buf		= wbuf;
-		x->len			= wlen;
-		x->bits_per_word	= 9;
-		spi_message_add_tail(x, &m);
-	}
-
-	if (rlen) {
-		// Arrange for the extra clock before the first data bit.
-		x++;
-		x->rx_buf		= &w;
-		x->len			= 2;
-		x->bits_per_word	= 9;
-		spi_message_add_tail(x, &m);
-		// Now read real data
-		x++;
-		x->rx_buf        = rbuf;
-		x->len           = rlen;
-		spi_message_add_tail(x, &m);
-	}
-
-	r = spi_sync(ddata->spi, &m);
-	if (r < 0)
-		dev_info(&ddata->spi->dev, "spi_sync %d\n", r);
-}
-
-#endif
-
 static inline void n8x0_panel_cmd(struct panel_drv_data *ddata, int cmd)
 {
 //	dev_info(&ddata->spi->dev, "%s(%02x)\n", __func__, cmd);
@@ -348,11 +231,11 @@ static inline void n8x0_panel_write(struct panel_drv_data *ddata,
 static inline void n8x0_panel_read(struct panel_drv_data *ddata,
 			      int reg, u8 *buf, int len)
 {
-	int i;
+//	int i;
 //	dev_info(&ddata->spi->dev, "%s(%02x, %d)\n", __func__, reg, len);
 	n8x0_panel_transfer(ddata, reg, NULL, 0, buf, len);
-	for (i=0; i<len; i++)
-		dev_info(&ddata->spi->dev, "%s  [%02x] %02x\n", __func__, i, buf[i]);
+//	for (i=0; i<len; i++)
+//		dev_info(&ddata->spi->dev, "%s  [%02x] %02x\n", __func__, i, buf[i]);
 }
 
 static void hw_guard_start(struct panel_drv_data *ddata, int guard_msec)

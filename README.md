@@ -17,6 +17,7 @@ Code quality of most changes is awful; main goal for now is to get the hardware 
   - whole driver should be rewritten using matrix-keypad framework
 - RGB LED in top left corner, working almost out-of-the-box with upstream lp5521 driver, just needed correct dt-bindings
 - tsl2563 ALS sensor, providing illumination data over IIO
+  - needs to be unbound from i2c device before suspending, else it fails in suspend() on i2c write timeout
 - wifi
   - depends on nasty workaround for mcspi fifo dma problem, see [bellow](#wifi)
 - USB

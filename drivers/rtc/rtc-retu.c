@@ -18,13 +18,6 @@ struct retu_rtc {
 	int irq_rtca;
 };
 
-#define RTC_TIME	0x00
-#define RTC_YEAR	0x04
-#define RTC_CTRL	0x10
-
-#define RTC_UNLOCK	BIT(1)
-#define RTC_ENABLE	BIT(0)
-
 static void retu_rtc_do_reset(struct retu_rtc *rtc)
 {
 	u16 ccr1;
