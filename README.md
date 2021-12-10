@@ -36,15 +36,25 @@ Waking up periodically just to do some background work will probably be necessar
 
 **Bluetooth**
 
-N810 uses BC4-ROM chip, almost certainly CSR BlueCore using HCI-UART BCSP protocol. There is support for protocol itself in the kernel.
+N810 uses BC4-ROM chip wired to the uart1 port (/dev/ttyS0; rx,tx,cts,rts), almost certainly  CSR BlueCore, should be using HCI-UART BCSP protocol. There is support for protocol itself in the kernel as well as lot of user-space tools.
 "hci_nokia" driver can be activated via dt-bindings including all gpios, however it fails no the protocol negotiation (most likely because it's not compatible with bcsp).
 - there is a "Frame reassembly failed" error in hci_nokia.c::nokia_recv(), caused by hci_h4.c::h4_recv_buf(). There seems to be 60 bytes response coming from the device with packet type 0x00, which is not listed in hci_nokia.c::nokia_recv_pkts list.
 New device driver will have to be written, combining OF probing and initialization from hci_nokia but using BCSP as uart protocol.
+- **Update:** reassembly error in hci_nokia driver is caused by the "received" buffer being all zeroes. Tests using user-space tools like bccmd, while controlling gpios manually, showed the bluetooth chip not responding to any kind of communication protocol on any standard speeds. There must be something critical missing here.
+I've abandonded the tests for now, with current overall state of the platform, bluetooth is simply not a priority.
+
+**GPS**
+
+There is a TI "NaviLink 4.0 GPS5300" chip wired to uart2 (/dev/ttyS1; rx,tx only). According to schematics, I2C_UART_N pin is pulled down which means serial port interface. There are 3 gpio control pins connected to omap2420, sleep input wired to menelaus INT output and rtc_clk input from 32khz buffered crystal.
+The GPS chip seems to work in principle - pulling it out of reset using gpio92 produces some kind of binary data on the serial port. The data consist mostly of zeros, I couldn't get anything recognizable out of it on any baudrate/bits/parity settings. In original firmware, there is a closed-source "gpsdriver" binary handling all the communication with this chip and I have not found any useful documentation either. gpsdriver itself can be started on this kernel just by mapping a couple libraries, however it fails on missing gpio-switch kernel driver which it apparently uses to control the chip. This driver actually uses bootloader-provided info from the omap-config ATAG, so pin mappings do not have to be hardcoded anywhere in kernel or libraries...
+Further tests abandoned for now, again not even a low priority until stuff like charging and suspending works.
 
 
 ## Not tested
 
 - Audio
+  - tlv320aic3x driver loads, there is a 1-0018 i2c device bound to it from the dt-binding, all the sound-related modules load fine as far as I can tell. However there are no sound devices present, and absolutely no log entries tracable to that i2c device or the sound subsystem.
+  - No idea what's wrong, kernel sound drivers are completely unknown territory for me, and this does not have high enough prio yet.
 
 
 ## Work in progress
@@ -56,9 +66,12 @@ New device driver will have to be written, combining OF probing and initializati
     - Vbat and Vchg are converted to mV reasonably well according to manual measurements
     - BSI is converted to mOhm approximately using table from old openwrt 3.3 kernel source
     - temperature is just raw adc reading for now, inverse proportional (302 -> room temp ~23dC, 220 already warm to the touch, ~37-40dC??)
+
   - retu-regs used for now to allow user-space access to Retu status register -> check for battery and charger presence
   - same retu-regs used to read battery current from Tahvo, and control charging PWM output
-  - very basic userspace charger written in bash works reasonably well
+
+  - very basic userspace charger written in python works reasonably well, seems stable enough to start porting to kernel. I have the outline of battery device and I'm trying to find some reasonable way to wire together the current monitoring and charge controler, both in DT and on driver level. It should leverage the Tahvo irq and timing settings for current monitoring, to avoid the need for periodic timer. It's also a question of logical structure - battery driver currently uses only iio, there is no hard connection to tahvo nor retu. Should the current monitor also be an iio-adc driver? How would we propagate the irq then? How should the battery and charger be coupled? There are several examples where charger is bound to battery using "power-supplies" that look promising, but I have to dig deeper into the code to understand how they cooperate. Also, as a preparation, the retu-mfd driver should be converted to interrupt-controller and all its internal mfd_cells to generic dt-bindings so it's easy to add new sub-drivers with their own interrupt handlers for both retu and tahvo chips, without extending retu driver itself all the time. It is a generic regmap already, so this should be doable without too much effort.
+
   - charging system is generally only working "reasonably well" ; even the original firmware produces very jumpy current flow from charger (checked with oscilloscope)
     - according to openwrt-linux-3.3, actual Ibat is 1/3 of the BATCURR reported by Tahvo ; preliminary observations confirm that. More precise tests pending until I set up external logging of Vbat/Ibat and Vchg/Ichg values independent of N810 itself. (interesting not-very-relevant todo: get Vchg measured at multiple points ; external / pcb connection of charge connector / same point as retu-madc)
     - if the battery is discharged enough, PWM goes to 100%, current consumption from charger is stable, Vchg and Vbat are pretty much the same as reported by retu-madc (Vchg =~ Vbat+80mV)
