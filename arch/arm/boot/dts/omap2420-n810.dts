@@ -168,12 +168,15 @@
 	/*
 	 * Temperature Sensor
 	 * https://www.ti.com/lit/ds/symlink/tmp105.pdf
+	 * won't work until menelaus vaux_ape control is available
 	 */
+/*
 	tmp105: tmp105@48 {
 		compatible = "ti,tmp105";
 		reg = <0x48>;
 		vs-supply = <&vaux_ape>;
 	};
+*/
 };
 
 &i2c2 {
