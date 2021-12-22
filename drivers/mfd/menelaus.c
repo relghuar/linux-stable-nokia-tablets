@@ -1140,6 +1140,10 @@ static inline void menelaus_rtc_init(struct menelaus_chip *m)
 
 /*-----------------------------------------------------------------------*/
 
+#ifdef CONFIG_MACH_NOKIA_N8X0
+extern int n8x0_menelaus_late_init(struct device *dev);
+#endif
+
 static struct i2c_driver menelaus_i2c_driver;
 
 static int menelaus_probe(struct i2c_client *client,
@@ -1211,6 +1215,11 @@ static int menelaus_probe(struct i2c_client *client,
 		err = menelaus_pdata->late_init(&client->dev);
 		if (err < 0)
 			goto fail;
+#ifdef CONFIG_MACH_NOKIA_N8X0
+	} else {
+		// FIXME: configuring late_init in board-n8x0 apparently does NOT work!
+		n8x0_menelaus_late_init(&client->dev);
+#endif
 	}
 
 	menelaus_rtc_init(menelaus);

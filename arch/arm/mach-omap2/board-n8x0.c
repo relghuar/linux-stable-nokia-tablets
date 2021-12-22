@@ -503,6 +503,8 @@ static int n8x0_auto_sleep_regulators(void)
 	u32 val;
 	int ret;
 
+	pr_info("%s\n", __func__);
+
 	val = EN_VPLL_SLEEP | EN_VMMC_SLEEP    \
 		| EN_VAUX_SLEEP | EN_VIO_SLEEP \
 		| EN_VMEM_SLEEP | EN_DC3_SLEEP \
@@ -521,6 +523,8 @@ static int n8x0_auto_voltage_scale(void)
 {
 	int ret;
 
+	pr_info("%s\n", __func__);
+
 	ret = menelaus_set_vcore_hw(1400, 1050);
 	if (ret < 0) {
 		pr_err("Could not set VCORE voltage on menelaus: %u\n", ret);
@@ -529,9 +533,17 @@ static int n8x0_auto_voltage_scale(void)
 	return 0;
 }
 
-static int n8x0_menelaus_late_init(struct device *dev)
+int n8x0_menelaus_late_init(struct device *dev)
 {
 	int ret;
+
+	pr_info("%s\n", __func__);
+
+	pr_info("%s: Setting VAUX on menelaus to 2.8V\n", __func__);
+	ret = menelaus_set_vaux(2800);
+	if (ret < 0) {
+		pr_err("Could not set VAUX voltage on menelaus: %d\n", ret);
+	}
 
 	ret = n8x0_auto_voltage_scale();
 	if (ret < 0)
@@ -543,7 +555,7 @@ static int n8x0_menelaus_late_init(struct device *dev)
 }
 
 #else
-static int n8x0_menelaus_late_init(struct device *dev)
+int n8x0_menelaus_late_init(struct device *dev)
 {
 	return 0;
 }
