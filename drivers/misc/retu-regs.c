@@ -204,7 +204,8 @@ static int retu_regs_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id of_retu_regs_match[] = {
-	{ .compatible = "nokia,retu,regs", },
+	{ .compatible = "nokia,retu-regs", },
+	{ .compatible = "nokia,tahvo-regs", },
 	{},
 };
 

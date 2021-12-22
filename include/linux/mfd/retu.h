@@ -20,7 +20,6 @@ int retu_write(struct retu_dev *, u8, u16);
 #define RETU_REG_ASICR		0x00		/* ASIC ID and revision */
 #define RETU_REG_ASICR_VILMA	(1 << 7)	/* Bit indicating Vilma */
 #define RETU_REG_IDR		0x01		/* Interrupt ID */
-#define RETU_REG_IMR		0x02		/* Interrupt mask (Retu) */
 #define RETU_REG_RTCDSR		0x03		/* RTC seconds register */
 #define RETU_REG_RTCHMR		0x04		/* RTC hours and minutes register */
 #define RETU_REG_RTCHMAR	0x05		/* RTC hours and minutes alarm and time set register */
@@ -35,10 +34,6 @@ int retu_write(struct retu_dev *, u8, u16);
 #define  RETU_REG_STATUS_BATAVAIL	0x0100	/* Battery available */
 #define  RETU_REG_STATUS_CHGPLUG	0x1000	/* Charger is plugged in */
 #define RETU_REG_WATCHDOG	0x17		/* Watchdog */
-
-#define TAHVO_REG_IMR		0x03		/* Interrupt mask (Tahvo) */
-#define TAHVO_REG_LEDPWM	0x05
-#define TAHVO_REG_VCORE		0x07
 
 /* Interrupt sources */
 #define RETU_INT_PWR		0		/* Power button */

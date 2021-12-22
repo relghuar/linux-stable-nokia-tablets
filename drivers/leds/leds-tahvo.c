@@ -14,6 +14,8 @@
 #include <linux/of.h>
 #include <linux/mfd/retu.h>
 
+#define TAHVO_REG_LEDPWM 0x05
+
 /* Maximum power/brightness value */
 #define TAHVO_LEDPWM_MAX 127
 

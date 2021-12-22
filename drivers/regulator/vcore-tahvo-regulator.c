@@ -17,7 +17,8 @@
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/of_regulator.h>
-#include <linux/mfd/retu.h>
+
+#define TAHVO_REG_VCORE		0x07
 
 static const unsigned int tahvo_vcore_voltages[] = {
 	1475000, 1443667, 1412333, 1381000, 1349667, 1318333, 1287000, 1255667,
@@ -50,7 +51,6 @@ static const struct regmap_config tahvo_vcore_regmap_config = {
 
 static int tahvo_vcore_regulator_probe(struct platform_device *pdev)
 {
-	struct retu_dev *retu = dev_get_drvdata(pdev->dev.parent);
 	struct device *dev = &pdev->dev;
 	struct regulator_init_data *init_data;
 	struct regulator_config cfg = {};
@@ -68,7 +68,12 @@ static int tahvo_vcore_regulator_probe(struct platform_device *pdev)
 	cfg.dev = dev;
 	cfg.init_data = init_data;
 	cfg.of_node = dev->of_node;
-	cfg.regmap = retu_get_regmap(retu);
+
+	cfg.regmap = dev_get_regmap(dev->parent, NULL);
+	if (!cfg.regmap) {
+		dev_err(dev, "failed to locate regmap\n");
+		return -ENODEV;
+	}
 
 	rdev = devm_regulator_register(dev, &vcore_regulator, &cfg);
 	if (IS_ERR(rdev)) {
@@ -82,7 +87,7 @@ static int tahvo_vcore_regulator_probe(struct platform_device *pdev)
 }
 
 static const struct of_device_id regulator_tahvo_vcore_of_match[] = {
-	{ .compatible = "nokia,tahvo,vcore-regulator", },
+	{ .compatible = "nokia,tahvo-vcore-regulator", },
 	{},
 };
 

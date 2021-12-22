@@ -215,7 +215,7 @@ static int retu_rtc_probe(struct platform_device *pdev)
 }
 
 static const struct of_device_id retu_rtc_match[] = {
-	{ .compatible = "nokia,retu,rtc", },
+	{ .compatible = "nokia,retu-rtc", },
 	{}
 };
 

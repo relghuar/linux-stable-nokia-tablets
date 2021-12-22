@@ -28,6 +28,11 @@
 #include <linux/interrupt.h>
 #include <linux/moduleparam.h>
 
+/* Registers */
+#define RETU_REG_IMR		0x02		/* Interrupt mask (Retu) */
+
+#define TAHVO_REG_IMR		0x03		/* Interrupt mask (Tahvo) */
+
 struct retu_dev {
 	struct regmap			*regmap;
 	struct device			*dev;
@@ -44,6 +49,24 @@ static const struct resource retu_pwrbutton_res[] = {
 	},
 };
 
+static const struct resource retu_rtc_res[] = {
+	{
+		.name	= "retu-rtc",
+		.start	= RETU_INT_RTCS,
+		.end	= RETU_INT_RTCA,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static const struct resource retu_madc_res[] = {
+	{
+		.name	= "retu-madc",
+		.start	= RETU_INT_ADCS,
+		.end	= RETU_INT_ADCS,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
 static const struct mfd_cell retu_devs[] = {
 	{
 		.name		= "retu-wdt"
@@ -52,13 +75,53 @@ static const struct mfd_cell retu_devs[] = {
 		.name		= "retu-pwrbutton",
 		.resources	= retu_pwrbutton_res,
 		.num_resources	= ARRAY_SIZE(retu_pwrbutton_res),
-	}
+	},
+	{
+		.name		= "retu-rtc",
+		.of_compatible	= "nokia,retu-rtc",
+		.resources	= retu_rtc_res,
+		.num_resources	= ARRAY_SIZE(retu_rtc_res),
+	},
+	{
+		.name		= "retu-madc",
+		.of_compatible	= "nokia,retu-madc",
+		.resources	= retu_madc_res,
+		.num_resources	= ARRAY_SIZE(retu_madc_res),
+	},
+	{
+		.name		= "retu-regs",
+		.of_compatible	= "nokia,retu-regs",
+	},
 };
 
 static struct regmap_irq retu_irqs[] = {
 	[RETU_INT_PWR] = {
 		.mask = 1 << RETU_INT_PWR,
-	}
+	},
+	[RETU_INT_CHAR] = {
+		.mask = 1 << RETU_INT_CHAR,
+	},
+	[RETU_INT_RTCS] = {
+		.mask = 1 << RETU_INT_RTCS,
+	},
+	[RETU_INT_RTCM] = {
+		.mask = 1 << RETU_INT_RTCM,
+	},
+	[RETU_INT_RTCD] = {
+		.mask = 1 << RETU_INT_RTCD,
+	},
+	[RETU_INT_RTCA] = {
+		.mask = 1 << RETU_INT_RTCA,
+	},
+	[RETU_INT_HOOK] = {
+		.mask = 1 << RETU_INT_HOOK,
+	},
+	[RETU_INT_HEAD] = {
+		.mask = 1 << RETU_INT_HEAD,
+	},
+	[RETU_INT_ADCS] = {
+		.mask = 1 << RETU_INT_ADCS,
+	},
 };
 
 static struct regmap_irq_chip retu_irq_chip = {
@@ -83,18 +146,48 @@ static const struct resource tahvo_usb_res[] = {
 	},
 };
 
+static const struct resource tahvo_batcurr_res[] = {
+	{
+		.name	= "tahvo-batcurr",
+		.start	= TAHVO_INT_BATCURR,
+		.end	= TAHVO_INT_BATCURR,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
 static const struct mfd_cell tahvo_devs[] = {
 	{
 		.name		= "tahvo-usb",
 		.resources	= tahvo_usb_res,
 		.num_resources	= ARRAY_SIZE(tahvo_usb_res),
 	},
+	{
+		.name		= "tahvo-ledpwm",
+		.of_compatible	= "nokia,tahvo-ledpwm",
+	},
+	{
+		.name		= "tahvo-vcore-regulator",
+		.of_compatible	= "nokia,tahvo-vcore-regulator",
+	},
+	{
+		.name		= "tahvo-batcurr-monitor",
+		.of_compatible	= "nokia,tahvo-batcurr-monitor",
+		.resources	= tahvo_batcurr_res,
+		.num_resources	= ARRAY_SIZE(tahvo_batcurr_res),
+	},
+	{
+		.name		= "tahvo-regs",
+		.of_compatible	= "nokia,tahvo-regs",
+	},
 };
 
 static struct regmap_irq tahvo_irqs[] = {
 	[TAHVO_INT_VBUS] = {
 		.mask = 1 << TAHVO_INT_VBUS,
-	}
+	},
+	[TAHVO_INT_BATCURR] = {
+		.mask = 1 << TAHVO_INT_BATCURR,
+	},
 };
 
 static struct regmap_irq_chip tahvo_irq_chip = {
@@ -260,46 +353,18 @@ static int retu_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 	if (ret < 0)
 		return ret;
 
-	ret = regmap_add_irq_chip(rdev->regmap, i2c->irq, IRQF_ONESHOT, -1,
-				  rdat->irq_chip, &rdev->irq_data);
+	ret = devm_regmap_add_irq_chip_fwnode(&i2c->dev, dev_fwnode(&i2c->dev),
+					      rdev->regmap, i2c->irq, IRQF_ONESHOT,
+					      -1, rdat->irq_chip, &rdev->irq_data);
 	if (ret < 0)
 		return ret;
 
-	ret = mfd_add_devices(rdev->dev, -1, rdat->children, rdat->nchildren,
-			      NULL, regmap_irq_chip_get_base(rdev->irq_data),
-			      NULL);
-	if (ret < 0) {
-		regmap_del_irq_chip(i2c->irq, rdev->irq_data);
+	ret = devm_mfd_add_devices(rdev->dev, -1, rdat->children,
+				   rdat->nchildren, NULL,
+				   regmap_irq_chip_get_base(rdev->irq_data),
+				   NULL);
+	if (ret < 0)
 		return ret;
-	}
-
-	if (rdev->dev->of_node) {
-		int ncells;
-		struct device_node *np = dev_of_node(rdev->dev);
-		struct device_node *child;
-		struct mfd_cell *cells;
-
-		ncells = of_get_available_child_count(np);
-		cells = devm_kzalloc(rdev->dev, ncells*sizeof(struct mfd_cell), GFP_KERNEL);
-
-		ncells = 0;
-		for_each_available_child_of_node(np, child) {
-			ret = of_property_read_string(child, "compatible", &cells[ncells].of_compatible);
-			if (!ret) {
-				cells[ncells].name = child->name;
-				dev_dbg(rdev->dev, "%s:   found cell '%s' compat='%s'\n",
-						__func__, child->name, cells[ncells].of_compatible);
-				ncells++;
-			}
-		}
-
-		dev_dbg(rdev->dev, "%s: adding %d cells\n", __func__, ncells);
-		if (ncells > 0) {
-			ret = mfd_add_devices(rdev->dev, -1, cells, ncells,
-					     NULL, regmap_irq_chip_get_base(rdev->irq_data),
-					     NULL);
-		}
-	}
 
 	if (i2c->addr == 1 && !pm_power_off) {
 		retu_pm_power_off = rdev;
@@ -317,8 +382,6 @@ static int retu_remove(struct i2c_client *i2c)
 		pm_power_off	  = NULL;
 		retu_pm_power_off = NULL;
 	}
-	mfd_remove_devices(rdev->dev);
-	regmap_del_irq_chip(i2c->irq, rdev->irq_data);
 
 	return 0;
 }

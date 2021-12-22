@@ -9,6 +9,13 @@
 	model = "Nokia N810";
 	compatible = "nokia,n810", "nokia,n8x0", "ti,omap2420", "ti,omap2";
 
+	/* controlled (enabled/disabled) directly by BC4-ROM and STLC4560 */
+	vctcxo: vctcxo {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <38400000>;
+	};
+
 	vio_ape: vio_ape {
 		compatible = "regulator-fixed";
 		regulator-name = "vio_ape";
@@ -85,31 +92,31 @@
 
 &retu {
 	retu_rtc: retu_rtc {
-		compatible = "nokia,retu,rtc";
+		compatible = "nokia,retu-rtc";
 	};
 	retu_madc: retu_madc {
 		compatible = "nokia,retu-madc";
 		#io-channel-cells = <1>;
 	};
 	retu_regs: retu_regs {
-		compatible = "nokia,retu,regs";
+		compatible = "nokia,retu-regs";
 		nregs = <0x20>;
 	};
 };
 
 &tahvo {
 	tahvo_ledpwm: tahvo_ledpwm {
-		compatible = "nokia,tahvo,ledpwm";
+		compatible = "nokia,tahvo-ledpwm";
 	};
 	tahvo_vcore: tahvo_vcore {
-		compatible = "nokia,tahvo,vcore-regulator";
+		compatible = "nokia,tahvo-vcore-regulator";
 		regulator-name = "tornado_vcore";
 		regulator-min-microvolt = <1005000>;
 		regulator-max-microvolt = <1475000>;
 		regulator-always-on;
 	};
 	tahvo_regs: tahvo_regs {
-		compatible = "nokia,retu,regs";
+		compatible = "nokia,tahvo-regs";
 		nregs = <0x0e>;
 	};
 };
@@ -168,15 +175,13 @@
 	/*
 	 * Temperature Sensor
 	 * https://www.ti.com/lit/ds/symlink/tmp105.pdf
-	 * won't work until menelaus vaux_ape control is available
+	 * FIXME: menelaus vaux_ape is currently enabled in n8x0 board init
 	 */
-/*
 	tmp105: tmp105@48 {
 		compatible = "ti,tmp105";
 		reg = <0x48>;
 		vs-supply = <&vaux_ape>;
 	};
-*/
 };
 
 &i2c2 {
@@ -311,7 +316,7 @@
 			reg = <1>;
 			color = <LED_COLOR_ID_GREEN>;
 			chan-name = "green";
-			led-cur = /bits/ 8 <0x02>;
+			led-cur = /bits/ 8 <0x01>;
 			max-cur = /bits/ 8 <0x5f>;
 			linux,default-trigger = "heartbeat";
 		};
