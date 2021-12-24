@@ -12,7 +12,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
-#include <linux/mfd/retu.h>
+#include <linux/regmap.h>
 
 #define TAHVO_REG_LEDPWM 0x05
 
@@ -21,7 +21,7 @@
 
 struct tahvo_led {
 	struct led_classdev cdev;
-	struct retu_dev *rdev;
+	struct regmap *regmap;
 };
 
 static int tahvo_led_brightness_set(struct led_classdev *cdev,
@@ -29,12 +29,11 @@ static int tahvo_led_brightness_set(struct led_classdev *cdev,
 {
 	struct tahvo_led *led = container_of(cdev, struct tahvo_led, cdev);
 
-	return retu_write(led->rdev, TAHVO_REG_LEDPWM, brightness);
+	return regmap_write(led->regmap, TAHVO_REG_LEDPWM, brightness);
 }
 
 static int tahvo_led_probe(struct platform_device *pdev)
 {
-	struct retu_dev *rdev = dev_get_drvdata(pdev->dev.parent);
 	struct tahvo_led *led;
 	struct led_init_data init_data;
 	int ret;
@@ -49,9 +48,11 @@ static int tahvo_led_probe(struct platform_device *pdev)
 		dev_warn(&pdev->dev, "No OF node found, using default name!\n");
 		led->cdev.name = "tahvo:led";
 	}
-	led->rdev = rdev;
+
 	led->cdev.max_brightness = TAHVO_LEDPWM_MAX;
 	led->cdev.brightness_set_blocking = tahvo_led_brightness_set;
+
+	led->regmap = dev_get_regmap(pdev->dev.parent, NULL);
 
 	init_data.fwnode = of_fwnode_handle(pdev->dev.of_node);
 
