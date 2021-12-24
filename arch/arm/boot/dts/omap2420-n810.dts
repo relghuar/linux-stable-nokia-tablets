@@ -82,11 +82,12 @@
 		};
 	};
 
-	/* controlled (enabled/disabled) directly by BC4-ROM and STLC4560 */
-	vctcxo: vctcxo {
-		compatible = "fixed-clock";
-		#clock-cells = <0>;
-		clock-frequency = <38400000>;
+	battery: n8x0-battery {
+		compatible = "nokia,n8x0-battery";
+		io-channels = <&retu_madc 1>, <&retu_madc 2>, <&retu_madc 8>;
+		io-channel-names = "bsi", "temp", "vbat";
+		current-monitor = <&tahvo_batcurr>;
+		power-supplies = <&tahvo_charger>;
 	};
 };
 
@@ -114,6 +115,14 @@
 		regulator-min-microvolt = <1005000>;
 		regulator-max-microvolt = <1475000>;
 		regulator-always-on;
+	};
+	tahvo_batcurr: tahvo_batcurr {
+		compatible = "nokia,tahvo-batcurr-monitor";
+	};
+	tahvo_charger: tahvo_charger {
+		compatible = "nokia,tahvo-charger";
+		io-channels = <&retu_madc 3>;
+		io-channel-names = "vchg";
 	};
 	tahvo_regs: tahvo_regs {
 		compatible = "nokia,tahvo-regs";
