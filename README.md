@@ -99,7 +99,7 @@ Further tests abandoned for now, again not even a low priority until stuff like 
 - start adding retu/tahvo drivers for battery management
   - because of lack of documentation of both chips, best source will probably be latest reasonable [openwrt patches for v3.3 kernel](https://git.openwrt.org/?p=openwrt/openwrt.git;a=tree;f=target/linux/omap24xx/patches-3.3;hb=fa097e5ae5fddb82a077a0bb1676a512fa2d908e), as well as original (even more ancient) [vendor sources](http://repository.maemo.org/pool/maemo4.1.2/free/k/kernel-source-diablo/)
   - *first step will probably be some debug readout (sysfs?) of all registers from both retu and tahvo chips*
-    - **DONE:** retu-regs driver exports both Retu and Tahvo registers into sysfs. I have already
+    - **DONE:** retu-regs driver exports both Retu and Tahvo registers into sysfs. I have already written a simple user-space charging controller in python as proof of concept.
 
 - battery management
   - current monitoring could probably use another iio adc driver? (trivial single-channel with on/off control and interrupt trigger??)
@@ -107,6 +107,10 @@ Further tests abandoned for now, again not even a low priority until stuff like 
 
 - fix mcspi fifo dma issue for 16-bit spi transfers to have wifi working without the hack (no idea where to start without SoC docs)
 
+- Menelaus fixes
+  - menelaus_read_time crashes with corrupted stack, seems like 7byte spi buffer is the problem (has to be an even number apparently). No one noticed probably because whole RTC is off on N810 so this only gets executed in qemu, and only if menelaus-rtc is actually enabled in kernel config.
+  - n8x0_menelaus_late_init in the board-n8x0 code is never executed. It seems lots of the platform/of setup in pdata_quirks.c is mostly ignored; i2c devices at least for sure (because i2c busses are not whitelisted in board-generic).
+  - ultimately, at least voltage regulators should be exposed in the dt-bindings.
 
 
 ######
