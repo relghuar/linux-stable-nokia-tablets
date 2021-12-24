@@ -434,6 +434,13 @@ config CHARGER_PCF50633
 	help
 	  Say Y to include support for NXP PCF50633 Main Battery Charger.
 
+config BATTERY_N8X0
+	tristate "Nokia N800/N810 (RX-34, RX-44, RX-48) battery driver"
+	depends on RETU_MADC
+	help
+	  Say Y here to enable support for battery information on Nokia
+	  N800 and N810 tablets.
+
 config BATTERY_RX51
 	tristate "Nokia RX-51 (N900) battery driver"
 	depends on TWL4030_MADC
