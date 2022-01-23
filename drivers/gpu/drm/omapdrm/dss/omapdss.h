@@ -198,6 +198,55 @@ struct omapdss_dsi_ops {
 	bool (*is_video_mode)(struct omap_dss_device *dssdev);
 };
 
+struct rfbi_timings {
+	int cs_on_time;
+	int cs_off_time;
+	int we_on_time;
+	int we_off_time;
+	int re_on_time;
+	int re_off_time;
+	int we_cycle_time;
+	int re_cycle_time;
+	int cs_pulse_width;
+	int access_time;
+
+	int clk_div;
+
+	u32 tim[5];
+
+	int converted;
+};
+
+struct omapdss_rfbi_ops {
+	int (*connect)(struct omap_dss_device *dssdev,
+		struct omap_dss_device *dst);
+	void (*disconnect)(struct omap_dss_device *dssdev,
+		struct omap_dss_device *dst);
+
+	int (*enable)(struct omap_dss_device *dssdev);
+	void (*disable)(struct omap_dss_device *dssdev);
+
+	void (*set_timings)(struct omap_dss_device *dssdev,
+		struct videomode *vm);
+
+	int (*update)(struct omap_dss_device *dssdev,
+		void (*callback)(void *), void *data);
+
+	void (*set_pixel_size)(struct omap_dss_device *dssdev, int pixel_size);
+	void (*set_data_lines)(struct omap_dss_device *dssdev, int data_lines);
+	void (*set_rfbi_timings)(struct omap_dss_device *dssdev,
+		const struct rfbi_timings *timings);
+
+	int (*configure)(struct omap_dss_device *dssdev);
+
+	void (*bus_lock)(struct omap_dss_device *dssdev);
+	void (*bus_unlock)(struct omap_dss_device *dssdev);
+
+	void (*write_command)(struct omap_dss_device *dssdev, const void *buf, u32 len);
+	void (*read_data)(struct omap_dss_device *dssdev, void *buf, u32 len);
+	void (*write_data)(struct omap_dss_device *dssdev, const void *buf, u32 len);
+};
+
 struct omap_dss_device {
 	struct device *dev;
 
@@ -219,6 +268,8 @@ struct omap_dss_device {
 
 	const struct omapdss_dsi_ops *dsi_ops;
 	u32 bus_flags;
+
+	const struct omapdss_rfbi_ops *rfbi_ops;
 
 	/* OMAP DSS output specific fields */
 

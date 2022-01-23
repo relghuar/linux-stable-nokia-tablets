@@ -101,6 +101,20 @@ config OMAP2_DSS_DSI
 
 	  See http://www.mipi.org/ for DSI specifications.
 
+config OMAP2_DSS_RFBI
+	bool "RFBI/DBI support"
+	default n
+	select DRM_MIPI_DBI
+	select DRM_GEM_CMA_HELPER
+	help
+	  MIPI DBI (Display Bus Interface) support; RFBI (Remote Framebuffer
+	  Interface) in TI terminoloty.
+
+	  DBI is a bus between the host processor and a peripheral,
+	  such as a display or a framebuffer chip.
+
+	  See http://www.mipi.org/ for DBI specifications.
+
 config OMAP2_DSS_MIN_FCK_PER_PCK
 	int "Minimum FCK/PCK ratio (for scaling)"
 	range 0 32

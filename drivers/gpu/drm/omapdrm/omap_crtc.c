@@ -791,7 +791,7 @@ struct drm_crtc *omap_crtc_init(struct drm_device *dev,
 
 	channel = pipe->output->dispc_channel;
 
-	DBG("%s", channel_names[channel]);
+	DBG("%s: %s", __func__, channel_names[channel]);
 
 	omap_crtc = kzalloc(sizeof(*omap_crtc), GFP_KERNEL);
 	if (!omap_crtc)

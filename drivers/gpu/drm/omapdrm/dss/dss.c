@@ -979,6 +979,7 @@ static const struct dss_ops dss_ops_dra7 = {
 
 static const enum omap_display_type omap2plus_ports[] = {
 	OMAP_DISPLAY_TYPE_DPI,
+	OMAP_DISPLAY_TYPE_DBI,
 };
 
 static const enum omap_display_type omap34xx_ports[] = {
@@ -1629,6 +1630,9 @@ static struct platform_driver * const omap_dss_drivers[] = {
 	&omap_dispchw_driver,
 #ifdef CONFIG_OMAP2_DSS_DSI
 	&omap_dsihw_driver,
+#endif
+#ifdef CONFIG_OMAP2_DSS_RFBI
+	&omap_rfbihw_driver,
 #endif
 #ifdef CONFIG_OMAP2_DSS_VENC
 	&omap_venchw_driver,

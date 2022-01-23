@@ -228,8 +228,12 @@ static int omap_modeset_init(struct drm_device *dev)
 	int ret;
 	u32 plane_crtc_mask;
 
+	dev_info(dev->dev, "%s()\n", __func__);
+
 	if (!omapdss_stack_is_ready())
 		return -EPROBE_DEFER;
+
+	dev_info(dev->dev, "%s() stack ready\n", __func__);
 
 	drm_mode_config_init(dev);
 

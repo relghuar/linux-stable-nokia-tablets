@@ -78,6 +78,8 @@ struct omap_dss_device *omapdss_find_device_by_node(struct device_node *node)
 	struct omap_dss_device *dssdev;
 
 	list_for_each_entry(dssdev, &omapdss_devices_list, list) {
+		pr_info("%s(): dssdev=%px(%s) dssnode=%pOF node=%pOF\n", __func__,
+				dssdev, dssdev->name, dssdev->dev->of_node, node);
 		if (dssdev->dev->of_node == node)
 			return omapdss_device_get(dssdev);
 	}
@@ -287,8 +289,10 @@ bool omapdss_stack_is_ready(void)
 	struct omapdss_comp_node *comp;
 
 	list_for_each_entry(comp, &omapdss_comp_list, list) {
-		if (!omapdss_component_is_loaded(comp))
+		if (!omapdss_component_is_loaded(comp)) {
+			pr_info("%s(): NOT loaded: comp=%px(%s) of=%pOF\n", __func__, comp, comp->compat, comp->node);
 			return false;
+		}
 	}
 
 	return true;

@@ -547,6 +547,13 @@ config DRM_PANEL_SONY_ACX565AKM
 	  Say Y here if you want to enable support for the Sony ACX565AKM
 	  800x600 3.5" panel (found on the Nokia N900).
 
+config DRM_PANEL_NOKIA_N8X0
+	tristate "Nokia N8x0 panel"
+	depends on GPIOLIB && OF && SPI
+	help
+	  Say Y here if you want to enable support for the Nokia N800/N810
+	  800x480 4.13" panel (LS041Y3 with Epson S1D13745 framebuffer).
+
 config DRM_PANEL_TDO_TL070WSH30
 	tristate "TDO TL070WSH30 DSI panel"
 	depends on OF

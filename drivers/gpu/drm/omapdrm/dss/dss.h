@@ -543,6 +543,9 @@ extern struct platform_driver omap_dispchw_driver;
 #ifdef CONFIG_OMAP2_DSS_DSI
 extern struct platform_driver omap_dsihw_driver;
 #endif
+#ifdef CONFIG_OMAP2_DSS_RFBI
+extern struct platform_driver omap_rfbihw_driver;
+#endif
 #ifdef CONFIG_OMAP2_DSS_VENC
 extern struct platform_driver omap_venchw_driver;
 #endif
