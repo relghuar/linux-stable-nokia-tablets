@@ -1218,6 +1218,7 @@ static int menelaus_probe(struct i2c_client *client,
 #ifdef CONFIG_MACH_NOKIA_N8X0
 	} else {
 		// FIXME: configuring late_init in board-n8x0 apparently does NOT work!
+		// The whole pdata_quirks.c is useless for i2c devices.
 		n8x0_menelaus_late_init(&client->dev);
 #endif
 	}
