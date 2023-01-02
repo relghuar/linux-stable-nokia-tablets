@@ -11,11 +11,20 @@ fi
 GCCVER="`$GCC --version | head -1`"
 
 BDIR="`dirname $0`"
+
+if [ -r Makefile ] ; then
+	KERNELDIR="."
+else
+	KERNELDIR="${BDIR}/.."
+fi
+
 DTBNAME=omap2420-n810.dtb
 
-KVER="`cat Makefile 2>/dev/null | awk '/^VERSION =/{v=$3} /^PATCHLEVEL =/{p=$3} /^SUBLEVEL =/{s=$3} END{print v "." p "." s}' 2>/dev/null`"
+KVER="`cat "${KERNELDIR}/Makefile" 2>/dev/null | awk '/^VERSION =/{v=$3} /^PATCHLEVEL =/{p=$3} /^SUBLEVEL =/{s=$3} END{print v "." p "." s}' 2>/dev/null`"
 
-if [ ! -f Makefile -o "$KVER" == ".." ] ; then
+#echo "$KVER :: `ls -al ${KERNELDIR}/Makefile`"
+
+if [ ! -f "${KERNELDIR}/Makefile" -o "$KVER" == ".." ] ; then
 	echo "ERROR: no kernel found!"
 	exit 1
 fi

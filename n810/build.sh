@@ -8,7 +8,7 @@ echo "make..."
 time $BDIR/make || exit 1
 
 echo "modules..."
-rm -rf $RDIR/usr/lib/modules
+rm -rf $RDIR/lib/modules
 time $BDIR/make modules_install || exit 1
 
 echo "image..."
@@ -22,7 +22,7 @@ mkdir -p $RDIR/boot
 cp -a arch/arm/boot/dts/$DTBNAME $RDIR/boot/ || exit 1
 
 echo "output files:"
-ls -al $RDIR/boot/* arch/arm/boot/Image
+ls -al $RDIR/boot/* arch/arm/boot/Image arch/arm/boot/zImage
 
 echo "done."
 

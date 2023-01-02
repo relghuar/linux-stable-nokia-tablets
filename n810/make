@@ -2,7 +2,7 @@
 
 . `dirname $0`/init.sh
 
-mkdir -p $BDIR/rootfs/usr
+mkdir -p $BDIR/rootfs
 
-make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} INSTALL_MOD_PATH=n810/rootfs/usr -j15 $@
+make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} INSTALL_MOD_PATH=n810/rootfs -j15 $@
 
