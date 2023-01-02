@@ -925,6 +925,12 @@ static int rfbi_display_enable(struct omap_dss_device *dssdev)
 	if (r)
 		return r;
 
+	// if we don't do this, RFBI power stays in RPM_SUSPENDED and on shutdown,
+	// warning is dumped from rfbi_runtime_put !
+	r = rfbi_runtime_get();
+	if (r)
+		return r;
+
 	r = dss_mgr_register_framedone_handler(out->manager,
 			rfbi_framedone_callback, dssdev);
 	if (r) {
@@ -946,6 +952,7 @@ static int rfbi_display_enable(struct omap_dss_device *dssdev)
 	return 0;
 err1:
 	rfbi_runtime_put();
+	dispc_runtime_put();
 	return r;
 }
 
