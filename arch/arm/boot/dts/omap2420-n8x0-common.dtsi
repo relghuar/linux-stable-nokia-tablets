@@ -36,6 +36,26 @@
 	};
 };
 
+&{/cpus/cpu} {
+	operating-points = <
+		/* kHz    uV   - voltage not used */
+		/*  menelaus in auto-mode between 1050 and 1400mV */
+		 12000 1050000
+		133000 1200000
+		150000 1225000
+		266000 1325000
+		300000 1375000
+		330000 1400000
+	>;
+
+	//clocks = <&dpll_ck>;
+	clocks = <&mpu_ck>;
+	clock-names = "cpu";
+
+	clock-latency = <300000>; /* From omap-cpufreq driver */
+	#cooling-cells = <2>;
+};
+
 &i2c1 {
 	clock-frequency = <400000>;
 

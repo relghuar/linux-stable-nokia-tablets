@@ -155,9 +155,12 @@
 			compatible = "ti,omap2420-mcbsp";
 			reg = <0x48074000 0xff>;
 			reg-names = "mpu";
-			interrupts = <59>, /* TX interrupt */
-				     <60>; /* RX interrupt */
-			interrupt-names = "tx", "rx";
+			interrupts = <64>, /* OCP compliant interrupt */
+				     <59>, /* TX interrupt */
+				     <60>, /* RX interrupt */
+				     <61>; /* RX overflow interrupt */
+			interrupt-names = "common", "tx", "rx", "rx_overflow";
+			ti,buffer-size = <128>;
 			ti,hwmods = "mcbsp1";
 			dmas = <&sdma 31>,
 			       <&sdma 32>;
@@ -169,9 +172,11 @@
 			compatible = "ti,omap2420-mcbsp";
 			reg = <0x48076000 0xff>;
 			reg-names = "mpu";
-			interrupts = <62>, /* TX interrupt */
+			interrupts = <16>, /* OCP compliant interrupt */
+				     <62>, /* TX interrupt */
 				     <63>; /* RX interrupt */
-			interrupt-names = "tx", "rx";
+			interrupt-names = "common", "tx", "rx";
+			ti,buffer-size = <128>;
 			ti,hwmods = "mcbsp2";
 			dmas = <&sdma 33>,
 			       <&sdma 34>;

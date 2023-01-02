@@ -443,3 +443,17 @@
 	};
 };
 
+&uart1 {
+// FIXME: this would be convenient for gpio handling, but for now the BT module
+// does not react to anything - there is never any response on the uart regardless
+// of gpio or serial port configuration :-(
+//	bc4rom: bluetooth {
+//		compatible = "nokia,h4p-bluetooth";
+//		reset-gpios = <&gpio3 28 GPIO_ACTIVE_LOW>; /* 92 */
+//		host-wakeup-gpios = <&gpio4 2 GPIO_ACTIVE_HIGH>; /* 98 */
+//		bluetooth-wakeup-gpios = <&gpio2 29 GPIO_ACTIVE_HIGH>; /* 61 */
+//		clocks = <&vctcxo>;
+//		clock-names = "sysclk";
+//	};
+};
+
