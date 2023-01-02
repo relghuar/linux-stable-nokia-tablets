@@ -951,9 +951,6 @@ static int dss_init_ports(struct platform_device *pdev)
 		case OMAP_DISPLAY_TYPE_SDI:
 			ret = sdi_init_port(pdev, port);
 			break;
-		case OMAP_DISPLAY_TYPE_DBI:
-			ret = rfbi_init_port(pdev, port);
-			break;
 		default:
 			break;
 		}

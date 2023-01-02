@@ -249,61 +249,6 @@ static void rfbi_write_data(struct omap_dss_device *dssdev, const void *buf, u32
 	}
 }
 
-static void rfbi_write_pixels(struct omap_dss_device *dssdev,
-		const void __iomem *buf, int scr_width,
-		u16 x, u16 y,
-		u16 w, u16 h)
-{
-	int start_offset = scr_width * y + x;
-	int horiz_offset = scr_width - w;
-	int i;
-
-	if (rfbi->datatype == OMAP_DSS_RFBI_DATATYPE_16 &&
-	   rfbi->parallelmode == OMAP_DSS_RFBI_PARALLELMODE_8) {
-		const u16 __iomem *pd = buf;
-		pd += start_offset;
-
-		for (; h; --h) {
-			for (i = 0; i < w; ++i) {
-				const u8 __iomem *b = (const u8 __iomem *)pd;
-				rfbi_write_reg(dssdev, RFBI_PARAM, __raw_readb(b+1));
-				rfbi_write_reg(dssdev, RFBI_PARAM, __raw_readb(b+0));
-				++pd;
-			}
-			pd += horiz_offset;
-		}
-	} else if (rfbi->datatype == OMAP_DSS_RFBI_DATATYPE_24 &&
-	   rfbi->parallelmode == OMAP_DSS_RFBI_PARALLELMODE_8) {
-		const u32 __iomem *pd = buf;
-		pd += start_offset;
-
-		for (; h; --h) {
-			for (i = 0; i < w; ++i) {
-				const u8 __iomem *b = (const u8 __iomem *)pd;
-				rfbi_write_reg(dssdev, RFBI_PARAM, __raw_readb(b+2));
-				rfbi_write_reg(dssdev, RFBI_PARAM, __raw_readb(b+1));
-				rfbi_write_reg(dssdev, RFBI_PARAM, __raw_readb(b+0));
-				++pd;
-			}
-			pd += horiz_offset;
-		}
-	} else if (rfbi->datatype == OMAP_DSS_RFBI_DATATYPE_16 &&
-	   rfbi->parallelmode == OMAP_DSS_RFBI_PARALLELMODE_16) {
-		const u16 __iomem *pd = buf;
-		pd += start_offset;
-
-		for (; h; --h) {
-			for (i = 0; i < w; ++i) {
-				rfbi_write_reg(dssdev, RFBI_PARAM, __raw_readw(pd));
-				++pd;
-			}
-			pd += horiz_offset;
-		}
-	} else {
-		BUG();
-	}
-}
-
 static int rfbi_transfer_area(struct omap_dss_device *dssdev,
 		void (*callback)(void *data), void *data)
 {
@@ -579,71 +524,6 @@ static int rfbi_convert_timings(struct omap_dss_device *dssdev, struct rfbi_timi
 	t->tim[2] = div - 1;
 
 	t->converted = 1;
-
-	return 0;
-}
-
-/* xxx FIX module selection missing */
-static int rfbi_setup_te(struct omap_dss_device *dssdev, enum omap_rfbi_te_mode mode,
-			     unsigned hs_pulse_time, unsigned vs_pulse_time,
-			     int hs_pol_inv, int vs_pol_inv, int extif_div)
-{
-	int hs, vs;
-	int min;
-	u32 l;
-
-	DSSDBG("%s\n", __func__);
-
-	hs = ps_to_rfbi_ticks(dssdev, hs_pulse_time, 1);
-	vs = ps_to_rfbi_ticks(dssdev, vs_pulse_time, 1);
-	if (hs < 2)
-		return -EDOM;
-	if (mode == OMAP_DSS_RFBI_TE_MODE_2)
-		min = 2;
-	else /* OMAP_DSS_RFBI_TE_MODE_1 */
-		min = 4;
-	if (vs < min)
-		return -EDOM;
-	if (vs == hs)
-		return -EINVAL;
-	rfbi->te_mode = mode;
-	DSSDBG("setup_te: mode %d hs %d vs %d hs_inv %d vs_inv %d\n",
-		mode, hs, vs, hs_pol_inv, vs_pol_inv);
-
-	rfbi_write_reg(dssdev, RFBI_HSYNC_WIDTH, hs);
-	rfbi_write_reg(dssdev, RFBI_VSYNC_WIDTH, vs);
-
-	l = rfbi_read_reg(dssdev, RFBI_CONFIG(0));
-	if (hs_pol_inv)
-		l &= ~(1 << 21);
-	else
-		l |= 1 << 21;
-	if (vs_pol_inv)
-		l &= ~(1 << 20);
-	else
-		l |= 1 << 20;
-
-	return 0;
-}
-
-/* xxx FIX module selection missing */
-static int rfbi_enable_te(struct omap_dss_device *dssdev, bool enable, unsigned line)
-{
-	u32 l;
-
-	DSSDBG("te %d line %d mode %d\n", enable, line, rfbi->te_mode);
-	if (line > (1 << 11) - 1)
-		return -EINVAL;
-
-	l = rfbi_read_reg(dssdev, RFBI_CONFIG(0));
-	l &= ~(0x3 << 2);
-	if (enable) {
-		rfbi->te_enabled = 1;
-		l |= rfbi->te_mode << 2;
-	} else
-		rfbi->te_enabled = 0;
-	rfbi_write_reg(dssdev, RFBI_CONFIG(0), l);
-	rfbi_write_reg(dssdev, RFBI_LINE_NUMBER, line);
 
 	return 0;
 }
@@ -1018,11 +898,9 @@ static const struct omapdss_rfbi_ops rfbi_ops = {
         .enable = rfbi_display_enable,
         .disable = rfbi_display_disable,
 
-//        .check_timings = rfbi_check_timings,
         .set_timings = rfbi_set_timings,
         .get_timings = rfbi_get_timings,
 
-	.enable_te = rfbi_enable_te,
 	.update = rfbi_update,
 
 	.set_pixel_size = rfbi_set_pixel_size,
@@ -1208,46 +1086,5 @@ int __init rfbi_init_platform_driver(void)
 void rfbi_uninit_platform_driver(void)
 {
 	platform_driver_unregister(&omap_rfbihw_driver);
-}
-
-struct rfbi_port_data {
-	struct platform_device *pdev;
-	bool initialized;
-};
-
-int rfbi_init_port(struct platform_device *pdev, struct device_node *port)
-{
-	struct rfbi_port_data *rfbi_port;
-        struct device_node *ep;
-
-	rfbi_port = devm_kzalloc(&pdev->dev, sizeof(*rfbi_port), GFP_KERNEL);
-        if (!rfbi_port)
-                return -ENOMEM;
-
-	pr_debug("%s\n", __func__);
-
-        ep = omapdss_of_get_next_endpoint(port, NULL);
-        if (!ep)
-                return 0;
-
-        of_node_put(ep);
-
-        rfbi_port->pdev = pdev;
-
-        rfbi_init_output(pdev);
-
-        rfbi_port->initialized = true;
-
-        return 0;
-}
-
-void rfbi_uninit_port(struct device_node *port)
-{
-	struct rfbi_port_data *rfbi_port = port->data;
-
-        if (!rfbi_port->initialized)
-                return;
-
-        rfbi_uninit_output(rfbi_port->pdev);
 }
 
