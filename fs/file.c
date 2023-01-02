@@ -87,6 +87,21 @@ static void copy_fdtable(struct fdtable *nfdt, struct fdtable *ofdt)
 	copy_fd_bitmaps(nfdt, ofdt, ofdt->max_fds);
 }
 
+/*
+ * Note how the fdtable bitmap allocations very much have to be a multiple of
+ * BITS_PER_LONG. This is not only because we walk those things in chunks of
+ * 'unsigned long' in some places, but simply because that is how the Linux
+ * kernel bitmaps are defined to work: they are not "bits in an array of bytes",
+ * they are very much "bits in an array of unsigned long".
+ *
+ * The ALIGN(nr, BITS_PER_LONG) here is for clarity: since we just multiplied
+ * by that "1024/sizeof(ptr)" before, we already know there are sufficient
+ * clear low bits. Clang seems to realize that, gcc ends up being confused.
+ *
+ * On a 128-bit machine, the ALIGN() would actually matter. In the meantime,
+ * let's consider it documentation (and maybe a test-case for gcc to improve
+ * its code generation ;)
+ */
 static struct fdtable * alloc_fdtable(unsigned int nr)
 {
 	struct fdtable *fdt;
@@ -102,6 +117,7 @@ static struct fdtable * alloc_fdtable(unsigned int nr)
 	nr /= (1024 / sizeof(struct file *));
 	nr = roundup_pow_of_two(nr + 1);
 	nr *= (1024 / sizeof(struct file *));
+	nr = ALIGN(nr, BITS_PER_LONG);
 	/*
 	 * Note that this can drive nr *below* what we had passed if sysctl_nr_open
 	 * had been set lower between the check in expand_files() and here.  Deal
@@ -269,6 +285,19 @@ static unsigned int count_open_files(struct fdtable *fdt)
 	return i;
 }
 
+/*
+ * Note that a sane fdtable size always has to be a multiple of
+ * BITS_PER_LONG, since we have bitmaps that are sized by this.
+ *
+ * 'max_fds' will normally already be properly aligned, but it
+ * turns out that in the close_range() -> __close_range() ->
+ * unshare_fd() -> dup_fd() -> sane_fdtable_size() we can end
+ * up having a 'max_fds' value that isn't already aligned.
+ *
+ * Rather than make close_range() have to worry about this,
+ * just make that BITS_PER_LONG alignment be part of a sane
+ * fdtable size. Becuase that's really what it is.
+ */
 static unsigned int sane_fdtable_size(struct fdtable *fdt, unsigned int max_fds)
 {
 	unsigned int count;
@@ -276,7 +305,7 @@ static unsigned int sane_fdtable_size(struct fdtable *fdt, unsigned int max_fds)
 	count = count_open_files(fdt);
 	if (max_fds < NR_OPEN_DEFAULT)
 		max_fds = NR_OPEN_DEFAULT;
-	return min(count, max_fds);
+	return ALIGN(min(count, max_fds), BITS_PER_LONG);
 }
 
 /*
@@ -1000,7 +1029,16 @@ static unsigned long __fget_light(unsigned int fd, fmode_t mask)
 	struct files_struct *files = current->files;
 	struct file *file;
 
-	if (atomic_read(&files->count) == 1) {
+	/*
+	 * If another thread is concurrently calling close_fd() followed
+	 * by put_files_struct(), we must not observe the old table
+	 * entry combined with the new refcount - otherwise we could
+	 * return a file that is concurrently being freed.
+	 *
+	 * atomic_read_acquire() pairs with atomic_dec_and_test() in
+	 * put_files_struct().
+	 */
+	if (atomic_read_acquire(&files->count) == 1) {
 		file = files_lookup_fd_raw(files, fd);
 		if (!file || unlikely(file->f_mode & mask))
 			return 0;
