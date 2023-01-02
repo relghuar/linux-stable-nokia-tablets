@@ -380,7 +380,7 @@
 
 	touch: tsc2005@0 {
 		compatible = "ti,tsc2005";
-		spi-max-frequency = <6000000>;
+		spi-max-frequency = <20000000>;
 		reg = <0>;
 
 		vio-supply = <&vio_ape>;
@@ -401,7 +401,7 @@
 
 	lcd: n8x0_panel@1 {
 		compatible = "omapdss,nokia,n8x0_panel";
-		spi-max-frequency = <4000000>;
+		spi-max-frequency = <20000000>;
 		reg = <1>;
 
 		pinctrl-names = "default";
