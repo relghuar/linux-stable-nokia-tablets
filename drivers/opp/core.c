@@ -11,6 +11,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/clk.h>
+#include <linux/clk-provider.h>
 #include <linux/errno.h>
 #include <linux/err.h>
 #include <linux/slab.h>
@@ -737,6 +738,8 @@ static inline int _generic_set_opp_clk_only(struct device *dev, struct clk *clk,
 	/* We may reach here for devices which don't change frequency */
 	if (IS_ERR(clk))
 		return 0;
+
+	dev_info(dev, "%s: clk '%s' setting freq %lu\n", __func__, __clk_get_name(clk), freq);
 
 	ret = clk_set_rate(clk, freq);
 	if (ret) {

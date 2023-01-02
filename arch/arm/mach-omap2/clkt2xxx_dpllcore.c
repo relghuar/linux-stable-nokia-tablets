@@ -22,6 +22,8 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 
+#include <linux/clk-provider.h>
+
 #include "clock.h"
 #include "clock2xxx.h"
 #include "opp2xxx.h"
@@ -59,10 +61,14 @@ unsigned long omap2xxx_clk_get_core_rate(void)
 
 	v = omap2xxx_cm_get_core_clk_src();
 
+	pr_info("%s: core-clk=%lld v=%d\n", __func__, core_clk, v);
+
 	if (v == CORE_CLK_SRC_32K)
 		core_clk = 32768;
 	else
 		core_clk *= v;
+
+	pr_info("%s: result=%lld\n", __func__, core_clk);
 
 	return core_clk;
 }
@@ -114,6 +120,9 @@ int omap2_reprogram_dpllcore(struct clk_hw *hw, unsigned long rate,
 	struct prcm_config tmpset;
 	const struct dpll_data *dd;
 
+	pr_warn("%s: '%s' domain='%s' rate=%lu parent_rate=%lu\n", __func__,
+			clk_hw_get_name(hw), clk->clkdm_name, rate, parent_rate);
+
 	cur_rate = omap2xxx_clk_get_core_rate();
 	mult = omap2xxx_cm_get_core_clk_src();
 
@@ -123,8 +132,10 @@ int omap2_reprogram_dpllcore(struct clk_hw *hw, unsigned long rate,
 		omap2xxx_sdrc_reprogram(CORE_CLK_SRC_DPLL_X2, 1);
 	} else if (rate != cur_rate) {
 		valid_rate = omap2_dpllcore_round_rate(rate);
-		if (valid_rate != rate)
+		if (valid_rate != rate) {
+			pr_warn("%s: rate mismatch %u != %lu\n", __func__, valid_rate, rate);
 			return -EINVAL;
+		}
 
 		if (mult == 1)
 			low = curr_prcm_set->dpll_speed;
@@ -132,8 +143,10 @@ int omap2_reprogram_dpllcore(struct clk_hw *hw, unsigned long rate,
 			low = curr_prcm_set->dpll_speed / 2;
 
 		dd = clk->dpll_data;
-		if (!dd)
+		if (!dd) {
+			pr_warn("%s: no dpll_data!\n", __func__);
 			return -EINVAL;
+		}
 
 		tmpset.cm_clksel1_pll =
 			omap_clk_ll_ops.clk_readl(&dd->mult_div1_reg);

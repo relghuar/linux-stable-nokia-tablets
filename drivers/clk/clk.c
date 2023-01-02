@@ -1326,6 +1326,8 @@ static int clk_core_determine_round_nolock(struct clk_core *core,
 
 	lockdep_assert_held(&prepare_lock);
 
+	pr_info("%s(%s) crate=%lu\n", __func__, core->name, core->rate);
+
 	if (!core)
 		return 0;
 
@@ -1952,6 +1954,9 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
 
 	clk_core_get_boundaries(core, &min_rate, &max_rate);
 
+	pr_info("%s: clk %s rate %lu boundaries (%lu/%lu)\n",
+		 __func__, core->name, rate, min_rate, max_rate);
+
 	/* find the closest rate and parent clk/rate */
 	if (clk_core_can_round(core)) {
 		struct clk_rate_request req;
@@ -1963,8 +1968,14 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
 		clk_core_init_rate_req(core, &req);
 
 		ret = clk_core_determine_round_nolock(core, &req);
-		if (ret < 0)
+		if (ret < 0) {
+			pr_warn("%s: clk %s cannot get round for %lu (%lu/%lu)\n",
+				 __func__, core->name, rate, min_rate, max_rate);
 			return NULL;
+		}
+
+		pr_info("%s: clk %s round, bprate %lu, rate %lu\n",
+			 __func__, core->name, req.best_parent_rate, rate);
 
 		best_parent_rate = req.best_parent_rate;
 		new_rate = req.rate;
@@ -1975,18 +1986,26 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
 	} else if (!parent || !(core->flags & CLK_SET_RATE_PARENT)) {
 		/* pass-through clock without adjustable parent */
 		core->new_rate = core->rate;
+
+		pr_info("%s: clk %s, no parent, rate %lu\n",
+			 __func__, core->name, rate);
+
 		return NULL;
 	} else {
 		/* pass-through clock with adjustable parent */
 		top = clk_calc_new_rates(parent, rate);
 		new_rate = parent->new_rate;
+
+		pr_info("%s: clk %s, pass-through top=%s, rate %lu\n",
+			 __func__, core->name, top->name, rate);
+
 		goto out;
 	}
 
 	/* some clocks must be gated to change parent */
 	if (parent != old_parent &&
 	    (core->flags & CLK_SET_PARENT_GATE) && core->prepare_count) {
-		pr_debug("%s: %s not gated but wants to reparent\n",
+		pr_warn("%s: %s not gated but wants to reparent\n",
 			 __func__, core->name);
 		return NULL;
 	}
@@ -1995,7 +2014,7 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
 	if (parent && core->num_parents > 1) {
 		p_index = clk_fetch_parent_index(core, parent);
 		if (p_index < 0) {
-			pr_debug("%s: clk %s can not be parent of clk %s\n",
+			pr_warn("%s: clk %s can not be parent of clk %s\n",
 				 __func__, parent->name, core->name);
 			return NULL;
 		}
@@ -2192,8 +2211,11 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 
 	/* calculate new rates and get the topmost changed clock */
 	top = clk_calc_new_rates(core, req_rate);
-	if (!top)
+	if (!top) {
+		pr_warn("%s: failed to calc new rate %lu for '%s'\n",
+				__func__, req_rate, core->name);
 		return -EINVAL;
+	}
 
 	ret = clk_pm_runtime_get(core);
 	if (ret)
