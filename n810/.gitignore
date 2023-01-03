@@ -1,1 +1,3 @@
 /rootfs/
+/initfs/root/
+/initfs.cpio.gz
