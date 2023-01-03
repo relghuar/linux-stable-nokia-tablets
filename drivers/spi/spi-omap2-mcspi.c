@@ -361,6 +361,24 @@ static int mcspi_wait_for_reg_bit(void __iomem *reg, unsigned long bit)
 	return 0;
 }
 
+// FIXME: this is only here to 'gracefully ignore' EOW and TXFFE timeouts on N810!
+static int mcspi_wait_for_reg_bit_ms(void __iomem *reg, unsigned long bit, int ms)
+{
+	unsigned long timeout;
+
+	timeout = jiffies + msecs_to_jiffies(ms);
+	while (!(readl_relaxed(reg) & bit)) {
+		if (time_after(jiffies, timeout)) {
+			if (!(readl_relaxed(reg) & bit))
+				return -ETIMEDOUT;
+			else
+				return 0;
+		}
+		cpu_relax();
+	}
+	return 0;
+}
+
 static int mcspi_wait_for_completion(struct  omap2_mcspi *mcspi,
 				     struct completion *x)
 {
@@ -652,9 +670,11 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 		if (mcspi->fifo_depth > 0) {
 			irqstat_reg = mcspi->base + OMAP2_MCSPI_IRQSTATUS;
 
-			if (mcspi_wait_for_reg_bit(irqstat_reg,
-						OMAP2_MCSPI_IRQSTATUS_EOW) < 0)
-				dev_err(&spi->dev, "EOW timed out\n");
+			// FIXME: this should wait standard 1s and there should be no timeout!
+			// however, by ignoring a very short timeout the wifi works at ~50k/s
+			if (mcspi_wait_for_reg_bit_ms(irqstat_reg,
+						OMAP2_MCSPI_IRQSTATUS_EOW, 10) < 0)
+				dev_dbg(&spi->dev, "EOW timed out\n");
 
 			mcspi_write_reg(mcspi->master, OMAP2_MCSPI_IRQSTATUS,
 					OMAP2_MCSPI_IRQSTATUS_EOW);
@@ -664,10 +684,12 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 		if (rx == NULL) {
 			chstat_reg = cs->base + OMAP2_MCSPI_CHSTAT0;
 			if (mcspi->fifo_depth > 0) {
-				wait_res = mcspi_wait_for_reg_bit(chstat_reg,
-						OMAP2_MCSPI_CHSTAT_TXFFE);
+				// FIXME: this should wait standard 1s and there should be no timeout!
+				// however, by ignoring a very short timeout the wifi works at ~50k/s
+				wait_res = mcspi_wait_for_reg_bit_ms(chstat_reg,
+						OMAP2_MCSPI_CHSTAT_TXFFE, 10);
 				if (wait_res < 0)
-					dev_err(&spi->dev, "TXFFE timed out\n");
+					dev_dbg(&spi->dev, "TXFFE timed out\n");
 			} else {
 				wait_res = mcspi_wait_for_reg_bit(chstat_reg,
 						OMAP2_MCSPI_CHSTAT_TXS);
