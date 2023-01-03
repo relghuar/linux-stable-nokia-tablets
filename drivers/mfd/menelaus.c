@@ -1085,7 +1085,7 @@ static inline void menelaus_rtc_init(struct menelaus_chip *m)
 
 	/* assume 32KDETEN pin is pulled high */
 	if (!(menelaus_read_reg(MENELAUS_OSC_CTRL) & 0x80)) {
-		dev_dbg(&m->client->dev, "no 32k oscillator\n");
+		dev_warn(&m->client->dev, "no 32k oscillator\n");
 		return;
 	}
 
@@ -1139,6 +1139,10 @@ static inline void menelaus_rtc_init(struct menelaus_chip *m)
 #endif
 
 /*-----------------------------------------------------------------------*/
+
+#ifdef CONFIG_MACH_NOKIA_N8X0
+extern int n8x0_menelaus_late_init(struct device *dev);
+#endif
 
 static struct i2c_driver menelaus_i2c_driver;
 
@@ -1211,6 +1215,12 @@ static int menelaus_probe(struct i2c_client *client,
 		err = menelaus_pdata->late_init(&client->dev);
 		if (err < 0)
 			goto fail;
+#ifdef CONFIG_MACH_NOKIA_N8X0
+	} else {
+		// FIXME: configuring late_init in board-n8x0 apparently does NOT work!
+		// The whole pdata_quirks.c is useless for i2c devices.
+		n8x0_menelaus_late_init(&client->dev);
+#endif
 	}
 
 	menelaus_rtc_init(menelaus);

@@ -144,20 +144,6 @@ static void __init n8x0_usb_init(void) {}
 #endif /*CONFIG_USB_MUSB_TUSB6010 */
 
 
-static struct omap2_mcspi_device_config p54spi_mcspi_config = {
-	.turbo_mode	= 0,
-};
-
-static struct spi_board_info n800_spi_board_info[] __initdata = {
-	{
-		.modalias	= "p54spi",
-		.bus_num	= 2,
-		.chip_select	= 0,
-		.max_speed_hz   = 48000000,
-		.controller_data = &p54spi_mcspi_config,
-	},
-};
-
 #if defined(CONFIG_MENELAUS) && IS_ENABLED(CONFIG_MMC_OMAP)
 
 /*
@@ -517,6 +503,8 @@ static int n8x0_auto_sleep_regulators(void)
 	u32 val;
 	int ret;
 
+	pr_info("%s\n", __func__);
+
 	val = EN_VPLL_SLEEP | EN_VMMC_SLEEP    \
 		| EN_VAUX_SLEEP | EN_VIO_SLEEP \
 		| EN_VMEM_SLEEP | EN_DC3_SLEEP \
@@ -535,6 +523,8 @@ static int n8x0_auto_voltage_scale(void)
 {
 	int ret;
 
+	pr_info("%s\n", __func__);
+
 	ret = menelaus_set_vcore_hw(1400, 1050);
 	if (ret < 0) {
 		pr_err("Could not set VCORE voltage on menelaus: %u\n", ret);
@@ -543,9 +533,17 @@ static int n8x0_auto_voltage_scale(void)
 	return 0;
 }
 
-static int n8x0_menelaus_late_init(struct device *dev)
+int n8x0_menelaus_late_init(struct device *dev)
 {
 	int ret;
+
+	pr_info("%s\n", __func__);
+
+	pr_info("%s: Setting VAUX on menelaus to 2.8V\n", __func__);
+	ret = menelaus_set_vaux(2800);
+	if (ret < 0) {
+		pr_err("Could not set VAUX voltage on menelaus: %d\n", ret);
+	}
 
 	ret = n8x0_auto_voltage_scale();
 	if (ret < 0)
@@ -557,7 +555,7 @@ static int n8x0_menelaus_late_init(struct device *dev)
 }
 
 #else
-static int n8x0_menelaus_late_init(struct device *dev)
+int n8x0_menelaus_late_init(struct device *dev)
 {
 	return 0;
 }
@@ -590,7 +588,5 @@ omap_late_initcall(n8x0_late_initcall);
 void * __init n8x0_legacy_init(void)
 {
 	board_check_revision();
-	spi_register_board_info(n800_spi_board_info,
-				ARRAY_SIZE(n800_spi_board_info));
 	return &mmc1_data;
 }
