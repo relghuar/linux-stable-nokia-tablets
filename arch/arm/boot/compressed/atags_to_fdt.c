@@ -134,6 +134,7 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 	__be32 mem_reg_property[2 * 2 * NR_BANKS];
 	int memcount = 0;
 	int ret, memsize;
+	int atagcnt;
 
 	/* make sure we've got an aligned pointer */
 	if ((u32)atag_list & 0x3)
@@ -154,7 +155,18 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 	if (ret < 0)
 		return ret;
 
+	setprop_cell(fdt, "/chosen", "total_space", total_space);
+	atagcnt = 0;
+
 	for_each_tag(atag, atag_list) {
+
+		{
+			char name[32] = "atag-";
+			hex_str(name+5, atagcnt);
+			setprop(fdt, "/chosen", name, atag, sizeof(atag->hdr)+atag->hdr.size);
+			atagcnt++;
+		}
+
 		if (atag->hdr.tag == ATAG_CMDLINE) {
 			/* Append the ATAGS command line to the device tree
 			 * command line.
@@ -205,8 +217,12 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 			hex_str(serno, atag->u.serialnr.high);
 			hex_str(serno+8, atag->u.serialnr.low);
 			setprop_string(fdt, "/", "serial-number", serno);
+		} else if (atag->hdr.tag == 0x414F4D50) { // PMOA - omap config
+			setprop(fdt, "/chosen", "omap-config", &atag->u, atag->hdr.size);
 		}
 	}
+
+	setprop_cell(fdt, "/chosen", "nr_atags", atagcnt);
 
 	if (memcount) {
 		setprop(fdt, "/memory", "reg", mem_reg_property,
