@@ -1,0 +1,70 @@
+ctr                    16384  3
+aes_arm                16384  6
+aes_generic            40960  1 aes_arm
+ccm                    20480  9
+af_packet              40960  8
+nls_iso8859_1          16384  1
+nls_cp437              16384  1
+vfat                   20480  1
+fat                    65536  1 vfat
+mousedev               20480  0
+p54spi                 20480  0
+p54common              32768  1 p54spi
+crc_ccitt              16384  1 p54common
+mac80211              401408  2 p54spi,p54common
+libarc4                16384  1 mac80211
+ofpart                 16384  0
+sha256_generic         16384  0
+libsha256              16384  1 sha256_generic
+sha256_arm             20480  0
+cfg80211              286720  2 mac80211,p54common
+onenand_omap2          16384  0
+onenand                32768  1 onenand_omap2
+tsc2005                16384  0
+regmap_spi             16384  1 tsc2005
+tsc200x_core           16384  1 tsc2005
+snd_soc_tlv320aic3x_i2c    16384  0
+snd_soc_omap_mcbsp     24576  0
+snd_soc_tlv320aic3x    53248  1 snd_soc_tlv320aic3x_i2c
+omap_aes_driver        20480  0
+snd_soc_ti_sdma        16384  1 snd_soc_omap_mcbsp
+omap_crypto            16384  1 omap_aes_driver
+omap_sham              28672  0
+omap_rng               16384  0
+libaes                 16384  3 omap_aes_driver,aes_arm,aes_generic
+crypto_engine          16384  2 omap_aes_driver,omap_sham
+rng_core               16384  2 omap_rng
+snd_soc_core          126976  3 snd_soc_omap_mcbsp,snd_soc_ti_sdma,snd_soc_tlv320aic3x
+snd_pcm_dmaengine      16384  1 snd_soc_core
+omap_mailbox           16384  0
+snd_pcm                81920  4 snd_soc_omap_mcbsp,snd_pcm_dmaengine,snd_soc_core,snd_soc_tlv320aic3x
+snd_timer              24576  1 snd_pcm
+snd                    53248  3 snd_timer,snd_soc_core,snd_pcm
+soundcore              16384  1 snd
+tsl2563                16384  0
+evdev                  20480  1
+jffs2                 135168  0
+zlib_inflate           20480  1 jffs2
+lzo_compress           16384  1 jffs2
+lzo_decompress         16384  1 jffs2
+zlib_deflate           28672  1 jffs2
+mtdblock               16384  0
+mtd_blkdevs            16384  1 mtdblock
+ledtrig_timer          16384  0
+usb_f_ecm              16384  1
+g_ether                16384  0
+usb_f_rndis            20480  2 g_ether
+u_ether                20480  3 usb_f_ecm,g_ether,usb_f_rndis
+sunrpc                192512  1
+libcomposite           45056  3 usb_f_ecm,g_ether,usb_f_rndis
+configfs               32768  4 usb_f_ecm,usb_f_rndis,libcomposite
+tusb6010               20480  0
+phy_generic            16384  2 tusb6010
+musb_hdrc              73728  1 tusb6010
+udc_core               20480  5 usb_f_ecm,musb_hdrc,u_ether,usb_f_rndis,libcomposite
+usbcore               172032  1 musb_hdrc
+usb_common             16384  4 udc_core,musb_hdrc,libcomposite,usbcore
+nls_base               16384  6 nls_iso8859_1,nls_cp437,libcomposite,usbcore,vfat,fat
+ip_tables              20480  0
+x_tables               24576  1 ip_tables
+autofs4                28672  2
