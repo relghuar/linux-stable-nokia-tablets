@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/mfd/retu.h>
 #include <linux/module.h>
+#include <linux/mod_devicetable.h>
 #include <linux/stddef.h>
 #include <linux/mutex.h>
 #include <linux/bitops.h>
@@ -29,6 +30,8 @@
 #include <linux/gfp.h>
 #include <linux/err.h>
 #include <linux/regulator/consumer.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
 
 #include <linux/iio/iio.h>
 
@@ -268,11 +271,13 @@ err_devreg:
 	return ret;
 }
 
-static void retu_madc_remove(struct platform_device *pdev)
+static int retu_madc_remove(struct platform_device *pdev)
 {
 	struct iio_dev *iio_dev = platform_get_drvdata(pdev);
 
 	iio_device_unregister(iio_dev);
+
+	return 0;
 }
 
 #ifdef CONFIG_OF
@@ -288,7 +293,9 @@ static struct platform_driver retu_madc_driver = {
 	.remove = retu_madc_remove,
 	.driver = {
 		   .name = "retu_madc",
+#ifdef CONFIG_OF
 		   .of_match_table = of_match_ptr(retu_madc_of_match),
+#endif
 	},
 };
 

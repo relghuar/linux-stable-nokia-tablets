@@ -148,7 +148,6 @@ static int n8x0_battery_probe(struct platform_device *pdev)
 {
 	struct power_supply_config psy_cfg = {};
 	struct n8x0_device_info *di;
-	int ret;
 
 	di = devm_kzalloc(&pdev->dev, sizeof(*di), GFP_KERNEL);
 	if (!di)
@@ -194,7 +193,7 @@ static int n8x0_battery_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static void n8x0_battery_remove(struct platform_device *pdev)
+static int n8x0_battery_remove(struct platform_device *pdev)
 {
 	struct n8x0_device_info *di = platform_get_drvdata(pdev);
 
@@ -203,6 +202,8 @@ static void n8x0_battery_remove(struct platform_device *pdev)
 	iio_channel_release(di->channel_vbat);
 	iio_channel_release(di->channel_bsi);
 	iio_channel_release(di->channel_temp);
+
+	return 0;
 }
 
 #ifdef CONFIG_OF

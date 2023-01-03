@@ -105,6 +105,7 @@ static struct attribute *retu_regs_sysfs_attrs[] = {
 	NULL
 };
 #define ATTR_BASE 3
+ATTRIBUTE_GROUPS(retu_regs_sysfs);
 
 static ssize_t retu_regs_attr_show(struct kobject *kobj, struct attribute *attr,
 		char *buf)
@@ -143,7 +144,7 @@ static const struct sysfs_ops retu_regs_sysfs_ops = {
 
 static struct kobj_type retu_regs_ktype = {
 	.sysfs_ops = &retu_regs_sysfs_ops,
-	.default_attrs = retu_regs_sysfs_attrs,
+	.default_groups = retu_regs_sysfs_groups,
 };
 
 static int retu_regs_probe(struct platform_device *pdev)
@@ -195,11 +196,13 @@ static int retu_regs_probe(struct platform_device *pdev)
 		&pdev->dev.kobj, pdev->dev.of_node->name);
 }
 
-static void retu_regs_remove(struct platform_device *pdev)
+static int retu_regs_remove(struct platform_device *pdev)
 {
 	struct retu_regs *rregs = dev_get_drvdata(&pdev->dev);
 	kobject_del(&rregs->kobj);
 	kobject_put(&rregs->kobj);
+
+	return 0;
 }
 
 static const struct of_device_id of_retu_regs_match[] = {
