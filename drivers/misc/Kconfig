@@ -496,6 +496,13 @@ config VCPU_STALL_DETECTOR
 
 	  If you do not intend to run this kernel as a guest, say N.
 
+config RETU_REGS
+	tristate "Retu and Tahvo register access in sysfs"
+	depends on MFD_RETU
+	help
+	  Simple helper providing direct register access for Retu and Tahvo
+	  chips over sysfs.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
