@@ -10,21 +10,21 @@ Code quality of most changes is awful; main goal for now is to get the hardware 
 
 - Wifi does not work, but with strange symptoms. Device comes up, wpa_supplicant starts connecting to configured AP, however it always fails in 4-way handshake, always in same place:
 
-> Jan 03 13:32:34 n810 wpa_supplicant[297]: wlan0: SME: Trying to authenticate with XX:XX:XX:XX:XX:XX (SSID='xxx' freq=2452 MHz)
-> Jan 03 13:32:34 n810 kernel: wlan0: authenticate with XX:XX:XX:XX:XX:XX
-> Jan 03 13:32:34 n810 kernel: wlan0: 80 MHz not supported, disabling VHT
-> Jan 03 13:32:34 n810 kernel: wlan0: send auth to XX:XX:XX:XX:XX:XX (try 1/3)
-> Jan 03 13:32:34 n810 wpa_supplicant[297]: wlan0: Trying to associate with XX:XX:XX:XX:XX:XX (SSID='xxx' freq=2452 MHz)
-> Jan 03 13:32:34 n810 kernel: wlan0: authenticated
-> Jan 03 13:32:34 n810 kernel: wlan0: associate with XX:XX:XX:XX:XX:XX (try 1/3)
-> Jan 03 13:32:34 n810 kernel: wlan0: RX AssocResp from XX:XX:XX:XX:XX:XX (capab=0x1411 status=0 aid=36)
-> Jan 03 13:32:34 n810 kernel: wlan0: associated
-> Jan 03 13:32:34 n810 wpa_supplicant[297]: wlan0: Associated with XX:XX:XX:XX:XX:XX
-> Jan 03 13:32:34 n810 wpa_supplicant[297]: wlan0: CTRL-EVENT-SUBNET-STATUS-UPDATE status=0
-> Jan 03 13:32:38 n810 wpa_supplicant[297]: wlan0: CTRL-EVENT-DISCONNECTED bssid=XX:XX:XX:XX:XX:XX reason=2
-> Jan 03 13:32:38 n810 kernel: wlan0: deauthenticated from XX:XX:XX:XX:XX:XX (Reason: 2=PREV_AUTH_NOT_VALID)
-> Jan 03 13:32:38 n810 wpa_supplicant[297]: wlan0: WPA: 4-Way Handshake failed - pre-shared key may be incorrect
-> Jan 03 13:32:38 n810 wpa_supplicant[297]: wlan0: CTRL-EVENT-SSID-TEMP-DISABLED id=2 ssid="xxx" auth_failures=6 duration=143 reason=WRONG_KEY
+    Jan 03 13:32:34 n810 wpa_supplicant[297]: wlan0: SME: Trying to authenticate with XX:XX:XX:XX:XX:XX (SSID='xxx' freq=2452 MHz)
+    Jan 03 13:32:34 n810 kernel: wlan0: authenticate with XX:XX:XX:XX:XX:XX
+    Jan 03 13:32:34 n810 kernel: wlan0: 80 MHz not supported, disabling VHT
+    Jan 03 13:32:34 n810 kernel: wlan0: send auth to XX:XX:XX:XX:XX:XX (try 1/3)
+    Jan 03 13:32:34 n810 wpa_supplicant[297]: wlan0: Trying to associate with XX:XX:XX:XX:XX:XX (SSID='xxx' freq=2452 MHz)
+    Jan 03 13:32:34 n810 kernel: wlan0: authenticated
+    Jan 03 13:32:34 n810 kernel: wlan0: associate with XX:XX:XX:XX:XX:XX (try 1/3)
+    Jan 03 13:32:34 n810 kernel: wlan0: RX AssocResp from XX:XX:XX:XX:XX:XX (capab=0x1411 status=0 aid=36)
+    Jan 03 13:32:34 n810 kernel: wlan0: associated
+    Jan 03 13:32:34 n810 wpa_supplicant[297]: wlan0: Associated with XX:XX:XX:XX:XX:XX
+    Jan 03 13:32:34 n810 wpa_supplicant[297]: wlan0: CTRL-EVENT-SUBNET-STATUS-UPDATE status=0
+    Jan 03 13:32:38 n810 wpa_supplicant[297]: wlan0: CTRL-EVENT-DISCONNECTED bssid=XX:XX:XX:XX:XX:XX reason=2
+    Jan 03 13:32:38 n810 kernel: wlan0: deauthenticated from XX:XX:XX:XX:XX:XX (Reason: 2=PREV_AUTH_NOT_VALID)
+    Jan 03 13:32:38 n810 wpa_supplicant[297]: wlan0: WPA: 4-Way Handshake failed - pre-shared key may be incorrect
+    Jan 03 13:32:38 n810 wpa_supplicant[297]: wlan0: CTRL-EVENT-SSID-TEMP-DISABLED id=2 ssid="xxx" auth_failures=6 duration=143 reason=WRONG_KEY
 
   - funny enough, exactly same rootfs (same wpa_supplicant and config, same p54spi firmware) connects just fine with kernel built from n810-5.15 branch (v5.15.86 + same n810 patches)
 
